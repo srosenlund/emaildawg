@@ -65,6 +65,9 @@ func (ec *EmailConnector) Init(bridge *bridgev2.Bridge) {
 
 	ec.Config = Config{
 		IMAP: imapConfig,
+		// Preserve any already-parsed network config (oauth2 etc.) — Init must
+		// not clobber it back to zero-values.
+		OAuth2: ec.Config.OAuth2,
 		Network: NetworkConfig{
 			IMAP: imapConfig, // Keep Network.IMAP populated for backward compatibility
 		},
@@ -266,6 +269,12 @@ func (ec *EmailConnector) Start(ctx context.Context) error {
 // needed. Idempotent: it does nothing if the account already exists in the DB.
 func (ec *EmailConnector) autoLogin(ctx context.Context) error {
 	cfg := ec.Config.OAuth2
+	ec.Bridge.Log.Info().
+		Bool("enabled", cfg.Enabled).
+		Bool("has_tenant", cfg.TenantID != "").
+		Str("auto_login_email", cfg.AutoLoginEmail).
+		Str("owner_mxid", cfg.OwnerMXID).
+		Msg("autoLogin: config check")
 	if !cfg.Enabled || cfg.AutoLoginEmail == "" || cfg.OwnerMXID == "" {
 		return nil
 	}
