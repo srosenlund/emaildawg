@@ -1,0 +1,50 @@
+pkg/connector/config.go
+  s_b85fdc9b24e276::t_a2950ae5dfe12f 67,70-75
+  s_b85fdc9b24e276::t_eb5ac8161154cc 15,22-29
+pkg/connector/example-config.yaml
+  s_b85fdc9b24e276::t_942125dd99ee50 12-23
+docker-entrypoint.sh
+  s_b85fdc9b24e276::t_863f11363f3487 1-20
+pkg/imap/manager.go
+  s_b85fdc9b24e276::t_b52d0fc586a1ba 84
+  s_b85fdc9b24e276::t_c93225405f8932 42,48
+  s_b85fdc9b24e276::t_b9651584592ec0 25-29
+pkg/connector/connector.go
+  s_b85fdc9b24e276::t_976c648bd37fe8 138-142
+  s_b85fdc9b24e276::t_2bc8d56020994d 31-34
+pkg/connector/login.go
+  s_b85fdc9b24e276::t_e82aaaa6d1c2cc 46-63,69
+  s_b85fdc9b24e276::t_fcc6b5657e76a6 459
+  s_b85fdc9b24e276::t_5ead2790f701ed 140-142
+pkg/imap/xoauth2.go
+  s_b85fdc9b24e276::t_ab71cae67efe5a 1-117
+Dockerfile.sliplane
+  s_b85fdc9b24e276::t_47968682b9105d 1-6,8-27,32-37
+  s_b85fdc9b24e276::t_443082f23ad516 7
+  s_b85fdc9b24e276::t_0c187bb5da0656 28-31
+pkg/imap/client.go
+  s_b85fdc9b24e276::t_89612a20543998 360
+  s_b85fdc9b24e276::t_e07edd954263e7 432-445
+  s_b85fdc9b24e276::t_f5296d7eaa6dd8 531,534
+  s_b85fdc9b24e276::t_8e3450b96bed58 1711
+  s_b85fdc9b24e276::t_bbb6882c5518c0 115-118
+  s_b85fdc9b24e276::t_2ee63e40eb5a0e 316,325-332
+pkg/connector/client.go
+  s_b85fdc9b24e276::t_8e2bf5b4923f51 153
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "baf4243bd38dd6116ea81ab71727b4dea0d5a76b",
+  "prompts": {},
+  "sessions": {
+    "s_b85fdc9b24e276": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f0c16e0-5afb-482a-a505-6a89b59fb574",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
