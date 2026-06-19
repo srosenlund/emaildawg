@@ -1,0 +1,37 @@
+# Sliplane-compatible build of emaildawg.
+# Differs from the upstream Dockerfile by using a shell-capable Debian-slim
+# final stage (instead of distroless) so docker-entrypoint.sh can inject the
+# bbctl config from the EMAILDAWG_CONFIG_B64 env secret at startup.
+
+# --- Builder stage ---
+FROM golang:1.24-bookworm AS builder
+RUN apt-get update -y \
+    && apt-get install -y --no-install-recommends git ca-certificates build-essential libolm-dev \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /build
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=1 go build -o emaildawg ./cmd/emaildawg
+
+# --- Final runtime (Debian slim, has a shell) ---
+FROM debian:bookworm-slim
+RUN apt-get update -y \
+    && apt-get install -y --no-install-recommends ca-certificates libolm3 tzdata coreutils \
+    && rm -rf /var/lib/apt/lists/*
+RUN useradd -m -u 1000 nonroot
+
+COPY --from=builder /build/emaildawg /usr/bin/emaildawg
+COPY docker-entrypoint.sh /usr/bin/docker-entrypoint.sh
+RUN chmod +x /usr/bin/docker-entrypoint.sh
+
+# Create the data dir and hand the app tree to the unprivileged user before
+# dropping privileges (mkdir as nonroot would hit permission denied).
+RUN mkdir -p /home/nonroot/app/data && chown -R nonroot:nonroot /home/nonroot/app
+
+USER nonroot
+WORKDIR /home/nonroot/app
+VOLUME ["/home/nonroot/app/data"]
+
+EXPOSE 29319
+ENTRYPOINT ["/usr/bin/docker-entrypoint.sh"]

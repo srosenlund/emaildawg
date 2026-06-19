@@ -12,10 +12,21 @@ var ExampleConfig string
 type Config struct {
 	// Top-level blocks to match example-config.yaml structure
 	IMAP       IMAPConfig        `yaml:"imap"`
+	OAuth2     OAuth2Config      `yaml:"oauth2"`
 	Logging    LoggingConfig     `yaml:"logging"`
 	Processing ProcessingConfig  `yaml:"email_processing"`
 	// Keep Network for internal use but don't map to YAML
 	Network    NetworkConfig     `yaml:"-"`
+}
+
+// OAuth2Config enables Microsoft 365 modern auth (XOAUTH2). When Enabled, the
+// bridge authenticates IMAP with an app-only access token from the given Entra
+// app instead of a password, and forces the Office 365 IMAP endpoint.
+type OAuth2Config struct {
+	Enabled      bool   `yaml:"enabled"`
+	TenantID     string `yaml:"tenant_id"`
+	ClientID     string `yaml:"client_id"`
+	ClientSecret string `yaml:"client_secret"`
 }
 
 type NetworkConfig struct {
@@ -53,9 +64,15 @@ func upgradeConfig(helper up.Helper) {
 	
 	// IMAP configuration
 	helper.Copy(up.Int, "imap", "default_timeout")
-	helper.Copy(up.Int, "imap", "startup_backfill_seconds") 
+	helper.Copy(up.Int, "imap", "startup_backfill_seconds")
 	helper.Copy(up.Int, "imap", "startup_backfill_max")
 	helper.Copy(up.Int, "imap", "initial_idle_timeout_seconds")
+
+	// OAuth2 (Microsoft 365 XOAUTH2) configuration
+	helper.Copy(up.Bool, "oauth2", "enabled")
+	helper.Copy(up.Str, "oauth2", "tenant_id")
+	helper.Copy(up.Str, "oauth2", "client_id")
+	helper.Copy(up.Str, "oauth2", "client_secret")
 	
 	// Email processing configuration
 	helper.Copy(up.Int, "email_processing", "max_upload_bytes")

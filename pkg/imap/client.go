@@ -112,6 +112,10 @@ type Client struct {
 	Password string
 	TLS      bool
 
+	// OAuth2 (Microsoft 365 XOAUTH2). When non-nil, authentication uses an
+	// app-only access token instead of Password.
+	tokenProvider *XOAuth2TokenProvider
+
 	// Logging/sanitization
 	sanitized bool
 	secret    string
@@ -309,7 +313,7 @@ func getSecureTLSConfig(serverName string) *tls.Config {
 }
 
 // NewClient creates a new IMAP client for the given email account
-func NewClient(email, username, password string, login *bridgev2.UserLogin, log *zerolog.Logger, sanitized bool, secret string, backfillSeconds int, backfillMax int, initialIdleTimeoutSeconds int, stateCoord StateCoordinator) (*Client, error) {
+func NewClient(email, username, password string, login *bridgev2.UserLogin, log *zerolog.Logger, sanitized bool, secret string, backfillSeconds int, backfillMax int, initialIdleTimeoutSeconds int, stateCoord StateCoordinator, tokenProvider *XOAuth2TokenProvider) (*Client, error) {
 	// Auto-detect provider settings
 	domain := strings.ToLower(strings.Split(email, "@")[1])
 	provider, ok := CommonProviders[domain]
@@ -318,7 +322,14 @@ func NewClient(email, username, password string, login *bridgev2.UserLogin, log 
 	var port int
 	var useTLS bool
 
-	if ok {
+	if tokenProvider != nil {
+		// OAuth2 (Microsoft 365) — force the Office 365 IMAP endpoint regardless
+		// of the email domain (e.g. custom vanity domains on Exchange Online).
+		host = "outlook.office365.com"
+		port = 993
+		useTLS = true
+		log.Info().Str("email", email).Msg("Using XOAUTH2 (Microsoft 365) authentication")
+	} else if ok {
 		host = provider.Host
 		port = provider.Port
 		useTLS = provider.TLS
@@ -346,6 +357,7 @@ func NewClient(email, username, password string, login *bridgev2.UserLogin, log 
 		Port:             port,
 		Username:         username,
 		Password:         password, // Never logged
+		tokenProvider:    tokenProvider,
 		TLS:              useTLS,
 		login:            login,
 		log:              log,
@@ -417,6 +429,20 @@ func NewClient(email, username, password string, login *bridgev2.UserLogin, log 
 }
 
 // Connect establishes connection to the IMAP server
+// authenticate logs the given IMAP client in, using XOAUTH2 with an app-only
+// access token when a token provider is configured, otherwise classic
+// LOGIN with username/password.
+func (c *Client) authenticate(cli *imapclient.Client) error {
+	if c.tokenProvider != nil {
+		tok, err := c.tokenProvider.Token(c.ctx)
+		if err != nil {
+			return fmt.Errorf("acquire OAuth2 token: %w", err)
+		}
+		return cli.Authenticate(NewXOAuth2Client(c.Username, tok))
+	}
+	return cli.Login(c.Username, c.Password).Wait()
+}
+
 func (c *Client) Connect() error {
 	// Prevent concurrent connection attempts
 	c.connectingMu.Lock()
@@ -502,11 +528,10 @@ func (c *Client) connectInternal() error {
 	go func() {
 		defer common.RecoverToError(loginErr)
 
-		// Execute login with context awareness
-		cmd := c.client.Login(c.Username, c.Password)
+		// Execute login/authentication with context awareness
 		done := make(chan error, 1)
 		go func() {
-			done <- cmd.Wait()
+			done <- c.authenticate(c.client)
 		}()
 
 		select {
@@ -1683,7 +1708,7 @@ func (c *Client) ensureSentConnectionAndLoop() {
 			return nil, err
 		}
 		cli := imapclient.New(conn, &imapclient.Options{DebugWriter: &IMAPDebugWriter{logger: c.log, sanitized: c.sanitized}})
-		if err := cli.Login(c.Username, c.Password).Wait(); err != nil {
+		if err := c.authenticate(cli); err != nil {
 			conn.Close()
 			return nil, err
 		}

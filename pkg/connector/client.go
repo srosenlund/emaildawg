@@ -150,6 +150,7 @@ func (ec *EmailConnector) createIMAPClient(emailClient *EmailClient, login *brid
 		ec.Config.Network.IMAP.StartupBackfillMax,
 		ec.Config.Network.IMAP.InitialIdleTimeoutSeconds,
 		emailClient.stateCoordinator,
+		ec.tokenProvider,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create IMAP client: %w", err)

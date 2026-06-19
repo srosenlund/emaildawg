@@ -9,6 +9,18 @@ imap:
     # Initial IDLE timeout in seconds before reconnection
     initial_idle_timeout_seconds: 3
 
+# OAuth2 / XOAUTH2 (Microsoft 365 modern auth).
+# When enabled, the bridge authenticates IMAP via an app-only access token from
+# the Entra app below instead of a password, and forces the Office 365 IMAP
+# endpoint (outlook.office365.com:993). The Entra app needs the
+# IMAP.AccessAsApp application permission + an Exchange service principal with
+# mailbox access. Leave enabled=false to use classic password/app-password auth.
+oauth2:
+    enabled: false
+    tenant_id: ""
+    client_id: ""
+    client_secret: ""
+
 # Logging configuration
 logging:
     # Sanitize PII from logs (recommended for production)

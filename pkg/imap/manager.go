@@ -22,7 +22,11 @@ type Manager struct {
 	// Sanitization
 	sanitized bool
 	secret    string
-	
+
+	// OAuth2 (Microsoft 365 XOAUTH2) token provider, shared across accounts.
+	// Nil when classic password auth is in use.
+	tokenProvider *XOAuth2TokenProvider
+
 	// Map of userID+email -> IMAP client
 	clients map[string]*Client
 	mu      sync.RWMutex
@@ -35,12 +39,13 @@ type Manager struct {
 }
 
 // NewManager creates a new IMAP manager
-func NewManager(bridge *bridgev2.Bridge, log *zerolog.Logger, sanitized bool, secret string) *Manager {
+func NewManager(bridge *bridgev2.Bridge, log *zerolog.Logger, sanitized bool, secret string, tokenProvider *XOAuth2TokenProvider) *Manager {
 	return &Manager{
 		bridge:   bridge,
 		log:     log,
 		sanitized: sanitized,
 		secret:   secret,
+		tokenProvider: tokenProvider,
 		clients: make(map[string]*Client),
 		watchdogInterval: 60 * time.Second,
 		lastState: make(map[string]status.BridgeStateEvent),
@@ -76,7 +81,7 @@ func (m *Manager) AddAccount(login *bridgev2.UserLogin, email, username, passwor
 	logger := m.log.With().
 		Str("user", login.UserMXID.String()).
 		Str("email", email).Logger()
-client, err := NewClient(email, username, password, login, &logger, m.sanitized, m.secret, 180, 25, 3, nil)
+client, err := NewClient(email, username, password, login, &logger, m.sanitized, m.secret, 180, 25, 3, nil, m.tokenProvider)
 	if err != nil {
 		return fmt.Errorf("failed to create IMAP client: %w", err)
 	}

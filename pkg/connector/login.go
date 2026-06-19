@@ -43,25 +43,30 @@ type EmailLoginMetadata struct {
 
 // Start begins the login process
 func (elp *EmailLoginProcess) Start(ctx context.Context) (*bridgev2.LoginStep, error) {
+	fields := []bridgev2.LoginInputDataField{
+		{
+			Type:        bridgev2.LoginInputFieldTypeEmail,
+			ID:          "email",
+			Name:        "Email Address",
+			Description: "Your full email address",
+		},
+	}
+	// When OAuth2 (Microsoft 365 XOAUTH2) is enabled, authentication uses an
+	// app-only token — no password is collected.
+	if elp.connector.tokenProvider == nil {
+		fields = append(fields, bridgev2.LoginInputDataField{
+			Type:        bridgev2.LoginInputFieldTypePassword,
+			ID:          "password",
+			Name:        "Password",
+			Description: "Your email password or App Password",
+		})
+	}
 	return &bridgev2.LoginStep{
 		Type:         bridgev2.LoginStepTypeUserInput,
 		StepID:       "credentials",
 		Instructions: elp.buildLoginInstructions(),
 		UserInputParams: &bridgev2.LoginUserInputParams{
-			Fields: []bridgev2.LoginInputDataField{
-				{
-					Type:        bridgev2.LoginInputFieldTypeEmail,
-					ID:          "email",
-					Name:        "Email Address",
-					Description: "Your full email address",
-				},
-				{
-					Type:        bridgev2.LoginInputFieldTypePassword,
-					ID:          "password",
-					Name:        "Password",
-					Description: "Your email password or App Password",
-				},
-			},
+			Fields: fields,
 		},
 	}, nil
 }
@@ -132,7 +137,9 @@ func (elp *EmailLoginProcess) handleCredentials(ctx context.Context, input map[s
 	if elp.email == "" {
 		return nil, fmt.Errorf("email address is required")
 	}
-	if elp.password == "" {
+	// Password is not required in OAuth2 (Microsoft 365 XOAUTH2) mode — the
+	// bridge authenticates with an app-only access token instead.
+	if elp.password == "" && elp.connector.tokenProvider == nil {
 		return nil, fmt.Errorf("password is required")
 	}
 
@@ -449,7 +456,7 @@ func (elp *EmailLoginProcess) testIMAPConnectionAndKeep(ctx context.Context) (*i
 	finalLogger := logger.Logger()
 
 	// Create test IMAP client without UserLogin (just for testing connection)
-	client, err := imap.NewClient(elp.email, elp.username, elp.password, nil, &finalLogger, elp.connector.Config.Logging.Sanitized, elp.connector.Config.Logging.PseudonymSecret, elp.connector.Config.Network.IMAP.StartupBackfillSeconds, elp.connector.Config.Network.IMAP.StartupBackfillMax, elp.connector.Config.Network.IMAP.InitialIdleTimeoutSeconds, nil)
+	client, err := imap.NewClient(elp.email, elp.username, elp.password, nil, &finalLogger, elp.connector.Config.Logging.Sanitized, elp.connector.Config.Logging.PseudonymSecret, elp.connector.Config.Network.IMAP.StartupBackfillSeconds, elp.connector.Config.Network.IMAP.StartupBackfillMax, elp.connector.Config.Network.IMAP.InitialIdleTimeoutSeconds, nil, elp.connector.tokenProvider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create IMAP client: %w", err)
 	}

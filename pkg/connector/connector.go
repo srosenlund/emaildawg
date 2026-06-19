@@ -28,6 +28,10 @@ type EmailConnector struct {
 	ThreadManager *email.ThreadManager
 	Processor     *email.Processor
 	DB            *EmailAccountQuery
+
+	// tokenProvider is set when OAuth2 (Microsoft 365 XOAUTH2) is enabled in
+	// config. Shared across the manager and login flow.
+	tokenProvider *imap.XOAuth2TokenProvider
 }
 
 var (
@@ -131,7 +135,11 @@ func (ec *EmailConnector) Init(bridge *bridgev2.Bridge) {
 
 	// Initialize managers
 	logger := bridge.Log.With().Str("component", "imap").Logger()
-	ec.IMAPManager = imap.NewManager(bridge, &logger, ec.Config.Logging.Sanitized, ec.Config.Logging.PseudonymSecret)
+	if ec.Config.OAuth2.Enabled {
+		ec.tokenProvider = imap.NewXOAuth2TokenProvider(ec.Config.OAuth2.TenantID, ec.Config.OAuth2.ClientID, ec.Config.OAuth2.ClientSecret)
+		logger.Info().Msg("XOAUTH2 (Microsoft 365) authentication enabled")
+	}
+	ec.IMAPManager = imap.NewManager(bridge, &logger, ec.Config.Logging.Sanitized, ec.Config.Logging.PseudonymSecret, ec.tokenProvider)
 
 	roomLogger := bridge.Log.With().Str("component", "matrix").Logger()
 	ec.RoomManager = matrix.NewRoomManager(&roomLogger)
