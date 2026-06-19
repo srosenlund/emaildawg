@@ -20,6 +20,12 @@ oauth2:
     tenant_id: ""
     client_id: ""
     client_secret: ""
+    # Auto-login: when set, the bridge logs this mailbox in automatically at
+    # startup via XOAUTH2 — no interactive bot login needed. owner_mxid is the
+    # Beeper user that owns the bridge (the admin in bridge.permissions).
+    auto_login_email: ""
+    owner_mxid: ""
+    auto_login_folders: ["INBOX"]
 
 # Logging configuration
 logging:

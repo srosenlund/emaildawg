@@ -27,6 +27,14 @@ type OAuth2Config struct {
 	TenantID     string `yaml:"tenant_id"`
 	ClientID     string `yaml:"client_id"`
 	ClientSecret string `yaml:"client_secret"`
+
+	// AutoLogin: when AutoLoginEmail and OwnerMXID are set, the bridge logs that
+	// mailbox in automatically at startup via XOAUTH2 — no interactive bot login
+	// needed. Idempotent: skipped if the account already exists. AutoLoginFolders
+	// defaults to ["INBOX"] when empty.
+	AutoLoginEmail   string   `yaml:"auto_login_email"`
+	OwnerMXID        string   `yaml:"owner_mxid"`
+	AutoLoginFolders []string `yaml:"auto_login_folders"`
 }
 
 type NetworkConfig struct {
@@ -73,6 +81,9 @@ func upgradeConfig(helper up.Helper) {
 	helper.Copy(up.Str, "oauth2", "tenant_id")
 	helper.Copy(up.Str, "oauth2", "client_id")
 	helper.Copy(up.Str, "oauth2", "client_secret")
+	helper.Copy(up.Str, "oauth2", "auto_login_email")
+	helper.Copy(up.Str, "oauth2", "owner_mxid")
+	helper.Copy(up.List, "oauth2", "auto_login_folders")
 	
 	// Email processing configuration
 	helper.Copy(up.Int, "email_processing", "max_upload_bytes")

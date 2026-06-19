@@ -18,6 +18,7 @@ import (
 	"maunium.net/go/mautrix/bridgev2/commands"
 	"maunium.net/go/mautrix/bridgev2/database"
 	"maunium.net/go/mautrix/bridgev2/networkid"
+	"maunium.net/go/mautrix/id"
 )
 
 type EmailConnector struct {
@@ -252,6 +253,76 @@ func (ec *EmailConnector) createCommands() []commands.CommandHandler {
 
 func (ec *EmailConnector) Start(ctx context.Context) error {
 	ec.Bridge.Log.Info().Msg("Email connector starting...")
+	if err := ec.autoLogin(ctx); err != nil {
+		// Non-fatal: the bridge keeps running so the account can still be added
+		// manually via the bot if auto-login hits a problem.
+		ec.Bridge.Log.Error().Err(err).Msg("XOAUTH2 auto-login failed")
+	}
+	return nil
+}
+
+// autoLogin logs the configured mailbox in at startup via XOAUTH2 when
+// oauth2.auto_login_email + owner_mxid are set, so no interactive bot login is
+// needed. Idempotent: it does nothing if the account already exists in the DB.
+func (ec *EmailConnector) autoLogin(ctx context.Context) error {
+	cfg := ec.Config.OAuth2
+	if !cfg.Enabled || cfg.AutoLoginEmail == "" || cfg.OwnerMXID == "" {
+		return nil
+	}
+	log := ec.Bridge.Log.With().Str("component", "auto_login").Str("email", cfg.AutoLoginEmail).Logger()
+
+	// Idempotency: skip if the account already exists (the framework loads
+	// existing logins on its own, regardless of Start() ordering).
+	existing, err := ec.DB.GetAccount(ctx, cfg.OwnerMXID, cfg.AutoLoginEmail)
+	if err != nil {
+		return fmt.Errorf("check existing account: %w", err)
+	}
+	if existing != nil {
+		log.Info().Msg("Auto-login: account already configured, skipping")
+		return nil
+	}
+
+	owner, err := ec.Bridge.GetUserByMXID(ctx, id.UserID(cfg.OwnerMXID))
+	if err != nil {
+		return fmt.Errorf("get owner user %q: %w", cfg.OwnerMXID, err)
+	}
+
+	folders := cfg.AutoLoginFolders
+	if len(folders) == 0 {
+		folders = []string{"INBOX"}
+	}
+
+	// Store the account. Password is empty: XOAUTH2 uses the app-only token, so
+	// the IMAP client ignores it (host is forced to Office 365 in OAuth2 mode).
+	account := &EmailAccount{
+		UserMXID:         cfg.OwnerMXID,
+		Email:            cfg.AutoLoginEmail,
+		Username:         cfg.AutoLoginEmail,
+		Password:         "",
+		Host:             "outlook.office365.com",
+		Port:             993,
+		TLS:              true,
+		CreatedAt:        time.Now(),
+		LastSyncTime:     time.Now(),
+		MonitoredFolders: folders,
+	}
+	if err := ec.DB.UpsertAccount(ctx, account); err != nil {
+		return fmt.Errorf("save account: %w", err)
+	}
+
+	// Create the UserLogin — this triggers LoadUserLogin, which starts the IMAP
+	// (XOAUTH2) connection.
+	loginID := networkid.UserLoginID(fmt.Sprintf("email:%s", cfg.AutoLoginEmail))
+	_, err = owner.NewLogin(ctx, &database.UserLogin{
+		ID:         loginID,
+		RemoteName: cfg.AutoLoginEmail,
+		Metadata:   &EmailLoginMetadata{Email: cfg.AutoLoginEmail, Username: cfg.AutoLoginEmail},
+	}, &bridgev2.NewLoginParams{DeleteOnConflict: false})
+	if err != nil {
+		return fmt.Errorf("create login: %w", err)
+	}
+
+	log.Info().Strs("folders", folders).Msg("Auto-login: mailbox configured via XOAUTH2")
 	return nil
 }
 
