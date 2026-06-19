@@ -284,7 +284,19 @@ func (ec *EmailConnector) autoLogin(ctx context.Context) error {
 	// existing logins on its own, regardless of Start() ordering).
 	existing, err := ec.DB.GetAccount(ctx, cfg.OwnerMXID, cfg.AutoLoginEmail)
 	if err != nil {
-		return fmt.Errorf("check existing account: %w", err)
+		// Self-heal: when the stored credentials can't be decrypted (typically
+		// because the auto-generated passphrase was regenerated after a volume
+		// restore or container rebuild), delete the unreadable entry so the
+		// fresh auto-login below can store a new one with the current passphrase.
+		if strings.Contains(err.Error(), "decrypt stored credentials") {
+			log.Warn().Err(err).Msg("Stored credentials unreadable, deleting corrupt account for fresh auto-login")
+			if delErr := ec.DB.DeleteAccount(ctx, cfg.OwnerMXID, cfg.AutoLoginEmail); delErr != nil {
+				return fmt.Errorf("delete corrupt account: %w", delErr)
+			}
+			existing = nil
+		} else {
+			return fmt.Errorf("check existing account: %w", err)
+		}
 	}
 	if existing != nil {
 		log.Info().Msg("Auto-login: account already configured, skipping")
