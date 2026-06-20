@@ -342,6 +342,9 @@ func (ec *EmailConnector) Start(ctx context.Context) error {
 	// renewal goroutine). This is a no-op when OAuth2 is not configured.
 	ec.ensureGraphSubscription(ctx)
 
+	// One-shot stuck-message recovery (EMAILDAWG_FORCE_REDELIVER). No-op unless set.
+	go ec.forceRedeliver(ctx)
+
 	return nil
 }
 
