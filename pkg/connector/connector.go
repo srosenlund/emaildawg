@@ -3,6 +3,8 @@ package connector
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,6 +12,7 @@ import (
 
 	"github.com/iFixRobots/emaildawg/pkg/common"
 	"github.com/iFixRobots/emaildawg/pkg/email"
+	"github.com/iFixRobots/emaildawg/pkg/graph"
 	"github.com/iFixRobots/emaildawg/pkg/imap"
 	"github.com/iFixRobots/emaildawg/pkg/matrix"
 	"github.com/rs/zerolog"
@@ -20,6 +23,11 @@ import (
 	"maunium.net/go/mautrix/bridgev2/networkid"
 	"maunium.net/go/mautrix/id"
 )
+
+// webhookItem is enqueued by handleGraphWebhook for background processing.
+type webhookItem struct {
+	messageID string
+}
 
 type EmailConnector struct {
 	Bridge        *bridgev2.Bridge
@@ -33,6 +41,11 @@ type EmailConnector struct {
 	// tokenProvider is set when OAuth2 (Microsoft 365 XOAUTH2) is enabled in
 	// config. Shared across the manager and login flow.
 	tokenProvider *imap.XOAuth2TokenProvider
+
+	// Graph webhook fields — populated in Start() when a public_address is configured.
+	graphClient      *graph.Client
+	graphClientState string // expected clientState for signature validation
+	webhookQueue     chan webhookItem
 }
 
 var (
@@ -261,7 +274,147 @@ func (ec *EmailConnector) Start(ctx context.Context) error {
 		// manually via the bot if auto-login hits a problem.
 		ec.Bridge.Log.Error().Err(err).Msg("XOAUTH2 auto-login failed")
 	}
+
+	// Register the Graph webhook HTTP route when the bridge has a public address.
+	// GetRouter() lives on MatrixConnectorWithServer, which is only implemented
+	// when the appservice has a public_address configured.
+	matrixWithServer, hasServer := ec.Bridge.Matrix.(bridgev2.MatrixConnectorWithServer)
+	if !hasServer {
+		ec.Bridge.Log.Warn().Msg("Matrix connector does not support public routes; Graph webhooks disabled")
+		return nil
+	}
+	router := matrixWithServer.GetRouter()
+	if router == nil {
+		ec.Bridge.Log.Warn().Msg("No public_address configured; Graph webhooks disabled")
+		return nil
+	}
+
+	// Build a Graph client when OAuth2 credentials are available.
+	if ec.Config.OAuth2.Enabled && ec.Config.OAuth2.TenantID != "" {
+		tp := graph.NewTokenProvider(
+			ec.Config.OAuth2.TenantID,
+			ec.Config.OAuth2.ClientID,
+			ec.Config.OAuth2.ClientSecret,
+		)
+		ec.graphClient = graph.NewClient(tp, ec.Config.OAuth2.AutoLoginEmail)
+	}
+
+	// clientState is used to validate incoming notifications. In a later task it
+	// will be written into the subscription payload. For now derive it from the
+	// OAuth2 client secret or fall back to a stable placeholder.
+	ec.graphClientState = ec.Config.OAuth2.ClientSecret
+	if ec.graphClientState == "" {
+		ec.graphClientState = "emaildawg-graph-clientstate"
+	}
+
+	// Buffered channel to decouple the HTTP handler (must respond in 3s) from
+	// the blocking GetMessage + deliver work.
+	ec.webhookQueue = make(chan webhookItem, 256)
+
+	// Background worker: drain the queue, fetch each message, deliver.
+	go ec.runWebhookWorker(ctx)
+
+	router.HandleFunc("POST /_email/graph/webhook", ec.handleGraphWebhook)
+	ec.Bridge.Log.Info().Msg("Graph webhook endpoint registered at POST /_email/graph/webhook")
+
 	return nil
+}
+
+// handleGraphWebhook handles Microsoft Graph change-notification POSTs.
+// It first checks for the subscription-validation handshake. If not a
+// validation request, it parses the notification payload, validates the
+// clientState, enqueues message IDs, and responds 202 within the 3s window.
+func (ec *EmailConnector) handleGraphWebhook(w http.ResponseWriter, r *http.Request) {
+	// Validation handshake: Graph sends ?validationToken= when creating/renewing
+	// a subscription. Must respond within 10s.
+	if graph.ValidationResponse(w, r) {
+		return
+	}
+
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20)) // 1 MiB cap
+	if err != nil {
+		ec.Bridge.Log.Error().Err(err).Msg("Graph webhook: failed to read body")
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	n, err := graph.ParseNotifications(body)
+	if err != nil {
+		ec.Bridge.Log.Error().Err(err).Msg("Graph webhook: failed to parse notifications")
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	for _, item := range n.Value {
+		if item.ClientState != ec.graphClientState {
+			ec.Bridge.Log.Warn().
+				Str("got", item.ClientState).
+				Msg("Graph webhook: clientState mismatch — ignoring item")
+			continue
+		}
+		if item.ChangeType != "created" {
+			// Only process created messages in the current implementation.
+			continue
+		}
+		msgID := item.ResourceData.ID
+		if msgID == "" {
+			continue
+		}
+		select {
+		case ec.webhookQueue <- webhookItem{messageID: msgID}:
+		default:
+			ec.Bridge.Log.Warn().Str("message_id", msgID).Msg("Graph webhook: queue full, dropping message")
+		}
+	}
+
+	w.WriteHeader(http.StatusAccepted)
+}
+
+// runWebhookWorker drains the webhook queue and delivers each message.
+func (ec *EmailConnector) runWebhookWorker(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case item, ok := <-ec.webhookQueue:
+			if !ok {
+				return
+			}
+			ec.processWebhookItem(ctx, item)
+		}
+	}
+}
+
+// processWebhookItem fetches a Graph message and delivers it to Matrix.
+// Full multi-account routing (matching UserLogin by email) is deferred to a
+// later task. Here we fetch the message and then attempt delivery via the auto-
+// login account's EmailClient if it is already wired into the bridge.
+func (ec *EmailConnector) processWebhookItem(ctx context.Context, item webhookItem) {
+	if ec.graphClient == nil {
+		ec.Bridge.Log.Warn().Str("message_id", item.messageID).Msg("Graph webhook: no graphClient configured, cannot fetch message")
+		return
+	}
+
+	msg, err := ec.graphClient.GetMessage(ctx, item.messageID)
+	if err != nil {
+		ec.Bridge.Log.Error().Err(err).Str("message_id", item.messageID).Msg("Graph webhook: GetMessage failed")
+		return
+	}
+
+	// Locate the UserLogin for the auto-login mailbox and deliver via the first
+	// matching EmailClient. Full multi-account routing comes in Task 4.
+	loginID := networkid.UserLoginID(fmt.Sprintf("email:%s", ec.Config.OAuth2.AutoLoginEmail))
+	login := ec.Bridge.GetCachedUserLoginByID(loginID)
+	if login == nil {
+		ec.Bridge.Log.Warn().Str("message_id", item.messageID).Msg("Graph webhook: auto-login UserLogin not found, cannot deliver")
+		return
+	}
+	client, ok := login.Client.(*EmailClient)
+	if !ok {
+		ec.Bridge.Log.Warn().Str("message_id", item.messageID).Msg("Graph webhook: UserLogin client is not an EmailClient")
+		return
+	}
+	client.deliverGraphMessage(ctx, msg)
 }
 
 // autoLogin logs the configured mailbox in at startup via XOAUTH2 when
