@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/iFixRobots/emaildawg/pkg/graph"
@@ -85,6 +86,12 @@ func (ec *EmailConnector) ensureGraphSubscription(ctx context.Context) {
 			Str("subscription_id", gs.SubscriptionID).
 			Time("expiry", gs.SubscriptionExpiry).
 			Msg("Graph subscription: reusing existing valid subscription")
+		// EMAILDAWG_RESYNC=1: even when reusing an existing subscription, re-walk
+		// the inbox to sync read state for already-delivered mails.
+		if os.Getenv("EMAILDAWG_RESYNC") == "1" {
+			ec.Bridge.Log.Info().Msg("EMAILDAWG_RESYNC=1: re-walking inbox to sync read state")
+			go ec.runBackfill(ctx)
+		}
 		go ec.runSubscriptionRenewal(ctx, ownerMXID, email, gs.SubscriptionID, gs.SubscriptionExpiry)
 		return
 	}
@@ -135,6 +142,15 @@ func (ec *EmailConnector) ensureGraphSubscription(ctx context.Context) {
 	// subscription recreations (subscriptionRemoved) fall through to the
 	// lifecycle handler which calls reconcile instead.
 	if newGS.InboxDeltaLink == "" {
+		go ec.runBackfill(ctx)
+	}
+
+	// EMAILDAWG_RESYNC=1: re-walk the full inbox from scratch to sync read
+	// state for already-delivered mails. runBackfill always starts from an
+	// empty token so this unconditionally re-baselines read state without
+	// affecting the normal (non-RESYNC) code path.
+	if os.Getenv("EMAILDAWG_RESYNC") == "1" {
+		ec.Bridge.Log.Info().Msg("EMAILDAWG_RESYNC=1: re-walking inbox to sync read state")
 		go ec.runBackfill(ctx)
 	}
 

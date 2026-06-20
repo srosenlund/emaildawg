@@ -91,6 +91,9 @@ func (ec *EmailConnector) runBackfill(ctx context.Context) {
 
 		for _, msg := range msgs {
 			client.deliverGraphMessage(ctx, msg)
+			if msg.IsRead {
+				client.deliverReadReceipt(ctx, msg)
+			}
 		}
 		total += len(msgs)
 
@@ -205,6 +208,9 @@ func (ec *EmailConnector) reconcile(ctx context.Context) {
 
 		for _, msg := range msgs {
 			client.deliverGraphMessage(ctx, msg)
+			if msg.IsRead {
+				client.deliverReadReceipt(ctx, msg)
+			}
 		}
 		total += len(msgs)
 
