@@ -103,3 +103,6 @@ Icon
 *.keystore
 *.asc
 .git-credentials
+
+# Runtime crypto salt + connector state (must never be committed)
+data/
