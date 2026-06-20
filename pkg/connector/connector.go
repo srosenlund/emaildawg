@@ -277,17 +277,20 @@ func (ec *EmailConnector) Start(ctx context.Context) error {
 		ec.Bridge.Log.Error().Err(err).Msg("XOAUTH2 auto-login failed")
 	}
 
-	// Register the Graph webhook HTTP route when the bridge has a public address.
-	// GetRouter() lives on MatrixConnectorWithServer, which is only implemented
-	// when the appservice has a public_address configured.
-	matrixWithServer, hasServer := ec.Bridge.Matrix.(bridgev2.MatrixConnectorWithServer)
-	if !hasServer {
-		ec.Bridge.Log.Warn().Msg("Matrix connector does not support public routes; Graph webhooks disabled")
+	// Only start the Graph webhook infrastructure when Graph mode is enabled and
+	// a public address is configured (needed so ensureGraphSubscription can build
+	// the correct notificationUrl). The dedicated HTTP server on :29319 is used
+	// instead of the appservice mux so it works in Beeper bbctl websocket-mode
+	// where no inbound HTTP listener is started by the appservice.
+	if !ec.Config.Graph.Enabled {
 		return nil
 	}
-	router := matrixWithServer.GetRouter()
-	if router == nil {
-		ec.Bridge.Log.Warn().Msg("No public_address configured; Graph webhooks disabled")
+
+	// A public_address is still required so ensureGraphSubscription can build the
+	// correct notificationUrl for the Microsoft Graph subscription.
+	matrixWithServer, ok := ec.Bridge.Matrix.(interface{ GetPublicAddress() string })
+	if !ok || matrixWithServer.GetPublicAddress() == "" {
+		ec.Bridge.Log.Warn().Msg("Graph mode enabled but no public_address configured; Graph webhooks disabled")
 		return nil
 	}
 
@@ -316,9 +319,10 @@ func (ec *EmailConnector) Start(ctx context.Context) error {
 	// Background worker: drain the queue, fetch each message, deliver.
 	go ec.runWebhookWorker(ctx)
 
-	// Register the unified webhook+lifecycle handler.
-	router.HandleFunc("POST /_email/graph/webhook", ec.handleGraphWebhookFull)
-	ec.Bridge.Log.Info().Msg("Graph webhook endpoint registered at POST /_email/graph/webhook")
+	// Start the dedicated webhook HTTP server. It must be up before we call
+	// ensureGraphSubscription so that Graph can reach the endpoint during the
+	// subscription-validation handshake.
+	ec.startGraphWebhookServer(ctx)
 
 	// Create or reuse the Graph subscription (random clientState, persisted,
 	// renewal goroutine). This is a no-op when OAuth2 is not configured.

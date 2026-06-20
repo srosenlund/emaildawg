@@ -205,13 +205,25 @@ func (ec *EmailConnector) LoadUserLogin(ctx context.Context, login *bridgev2.Use
 	emailClient.stateCoordinator = coordinator.NewStateCoordinator(login, &ec.Bridge.Log)
 	login.Client = emailClient
 
-	// Extract email credentials
+	// Extract email address (needed in both graph and IMAP paths).
 	email, username, err := ec.extractEmailCredentials(login)
 	if err != nil {
 		return err
 	}
 	emailClient.Email = email
 	emailClient.Username = username
+
+	// In Graph mode we skip all IMAP credential loading and IMAP client
+	// creation. The EmailClient is wired up with just Email/Username so that
+	// processWebhookItem's GetCachedUserLoginByID resolves to a live
+	// login.Client and deliverGraphMessage (which uses ec.UserLogin) works.
+	// IMAP IDLE is NOT started in graph mode.
+	if ec.Config.Graph.Enabled {
+		ec.Bridge.Log.Info().
+			Str("email", emailClient.Email).
+			Msg("LoadUserLogin: graph mode — skipping IMAP credential load and IDLE start")
+		return nil
+	}
 
 	// Load account credentials from database
 	account, err := ec.loadAccountCredentials(ctx, login.UserMXID.String(), emailClient.Email)
