@@ -2,6 +2,7 @@ package connector
 
 import (
 	"context"
+	"time"
 
 	"maunium.net/go/mautrix/bridgev2"
 	"maunium.net/go/mautrix/bridgev2/networkid"
@@ -52,4 +53,27 @@ func (ec *EmailClient) deliverGraphMessage(ctx context.Context, g *graph.GraphMe
 	if res := ec.UserLogin.QueueRemoteEvent(evt); !res.Success {
 		ec.UserLogin.Log.Error().Msg("queue graph message failed")
 	}
+}
+
+// deliverReadReceipt enqueues a read receipt into the bridgev2 event pipeline,
+// marking all messages up to g.InternetMessageID as read in the Matrix room
+// that corresponds to g.ConversationID.  This is called by processWebhookItem
+// when a Graph "updated" notification arrives for an already-read message and
+// the notification is NOT suppressed (i.e. the read was initiated from Outlook,
+// not from within Beeper/Matrix).
+func (ec *EmailClient) deliverReadReceipt(ctx context.Context, g *graph.GraphMessage) {
+	ec.UserLogin.QueueRemoteEvent(&simplevent.Receipt{
+		EventMeta: simplevent.EventMeta{
+			Type: bridgev2.RemoteEventReadReceipt,
+			PortalKey: networkid.PortalKey{
+				ID:       networkid.PortalID("thread:" + g.ConversationID),
+				Receiver: ec.UserLogin.ID,
+			},
+			Sender: bridgev2.EventSender{
+				Sender: networkid.UserID("email:" + g.FromAddress),
+			},
+		},
+		LastTarget: networkid.MessageID("email:" + g.InternetMessageID),
+		ReadUpTo:   time.Now(),
+	})
 }

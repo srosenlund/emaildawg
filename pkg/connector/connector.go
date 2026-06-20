@@ -362,6 +362,12 @@ func (ec *EmailConnector) runWebhookWorker(ctx context.Context) {
 // Full multi-account routing (matching UserLogin by email) is deferred to a
 // later task. Here we fetch the message and then attempt delivery via the auto-
 // login account's EmailClient if it is already wired into the bridge.
+//
+// changeType routing:
+//   - "created" → deliver the full message (existing path).
+//   - "updated" → fetch message; if IsRead and NOT suppressed (echo of our own
+//     PATCH from Task 2), queue a read receipt. Suppression is keyed on
+//     InternetMessageID (same key used in Task 2's MarkRead suppress call).
 func (ec *EmailConnector) processWebhookItem(ctx context.Context, item webhookItem) {
 	if ec.graphClient == nil {
 		ec.Bridge.Log.Warn().Str("message_id", item.messageID).Msg("Graph webhook: no graphClient configured, cannot fetch message")
@@ -388,7 +394,25 @@ func (ec *EmailConnector) processWebhookItem(ctx context.Context, item webhookIt
 		ec.Bridge.Log.Warn().Str("message_id", item.messageID).Msg("Graph webhook: UserLogin client is not an EmailClient")
 		return
 	}
-	client.deliverGraphMessage(ctx, msg)
+
+	switch item.changeType {
+	case "updated":
+		// Suppress if this "updated" notification is the echo of our own
+		// PATCH (Task 2 marks the message read in Graph; Graph then fires an
+		// "updated" webhook back to us). Suppression key = InternetMessageID.
+		if ec.suppress.IsSuppressed(msg.InternetMessageID) {
+			ec.Bridge.Log.Debug().
+				Str("internet_message_id", msg.InternetMessageID).
+				Msg("Graph webhook: suppressed updated notification (echo of own PATCH)")
+			return
+		}
+		if msg.IsRead {
+			client.deliverReadReceipt(ctx, msg)
+		}
+	default:
+		// "created" (and anything else) → existing full-message deliver path.
+		client.deliverGraphMessage(ctx, msg)
+	}
 }
 
 // autoLogin logs the configured mailbox in at startup via XOAUTH2 when
