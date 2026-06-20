@@ -408,6 +408,10 @@ func (ec *EmailConnector) processWebhookItem(ctx context.Context, item webhookIt
 		}
 		if msg.IsRead {
 			client.deliverReadReceipt(ctx, msg)
+		} else {
+			ec.Bridge.Log.Debug().
+				Str("internet_message_id", msg.InternetMessageID).
+				Msg("Graph webhook: updated event with isRead=false, ignoring")
 		}
 	default:
 		// "created" (and anything else) → existing full-message deliver path.

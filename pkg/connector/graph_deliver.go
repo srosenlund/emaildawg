@@ -70,7 +70,8 @@ func (ec *EmailClient) deliverReadReceipt(ctx context.Context, g *graph.GraphMes
 				Receiver: ec.UserLogin.ID,
 			},
 			Sender: bridgev2.EventSender{
-				Sender: networkid.UserID("email:" + g.FromAddress),
+				IsFromMe:    true,
+				SenderLogin: ec.UserLogin.ID,
 			},
 		},
 		LastTarget: networkid.MessageID("email:" + g.InternetMessageID),
