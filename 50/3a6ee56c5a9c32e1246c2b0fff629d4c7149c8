@@ -1,0 +1,20 @@
+pkg/connector/graph_delta.go
+  s_b85fdc9b24e276::t_81b7a7189245f6 29-34,42-45,55-60,68,71-77,83,92-93,123-125
+  s_b85fdc9b24e276::t_794003140deb9f 126-127,162-166,171,174-180,197,206-207,227-231
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "503a6ee56c5a9c32e1246c2b0fff629d4c7149c8",
+  "prompts": {},
+  "sessions": {
+    "s_b85fdc9b24e276": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f0c16e0-5afb-482a-a505-6a89b59fb574",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
