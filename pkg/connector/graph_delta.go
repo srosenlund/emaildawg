@@ -26,6 +26,12 @@ func (ec *EmailConnector) lookupEmailClient() (*EmailClient, error) {
 	return client, nil
 }
 
+// maxDeltaPages is the upper bound on pages followed in a single backfill or
+// reconcile walk. Graph delta links are forward-only, so an infinite loop here
+// would stall the goroutine permanently. 1000 pages × 50 msgs/page = 50 000
+// messages — generous for any real inbox.
+const maxDeltaPages = 1000
+
 // runBackfill walks Graph delta pages from an empty token (initial backfill),
 // delivers each message via deliverGraphMessage, and stores the final deltaLink
 // in the DB so future reconcile calls can catch up incrementally.
@@ -33,6 +39,10 @@ func (ec *EmailConnector) lookupEmailClient() (*EmailClient, error) {
 // Bounded by Graph's own pagination — each page honours the maxpagesize=50
 // Prefer header set in DeltaPage. A full inbox backfill may span many pages;
 // messages are delivered as each page arrives so the caller stays responsive.
+//
+// Safety: if the email client is not ready (nil), the deltaLink is NOT
+// persisted — the next reconcile will re-run a full backfill once the client
+// is available, preventing silent mail loss.
 func (ec *EmailConnector) runBackfill(ctx context.Context) {
 	if ec.graphClient == nil {
 		return
@@ -42,10 +52,12 @@ func (ec *EmailConnector) runBackfill(ctx context.Context) {
 
 	client, err := ec.lookupEmailClient()
 	if err != nil {
-		log.Warn().Err(err).Msg("Graph delta: cannot deliver during backfill (client not ready)")
-		// Continue without delivery — we still want to record the deltaLink so
-		// reconcile can catch up from where we left off.
-		client = nil
+		// Client not ready — do NOT persist the deltaLink. Graph delta links are
+		// forward-only: persisting while delivery is skipped causes permanent mail
+		// loss on the next reconcile. Log a WARN and return; the next trigger will
+		// re-run a full backfill once the client is available.
+		log.Warn().Err(err).Msg("Graph backfill: email client not ready — not persisting deltaLink, will retry on next trigger")
+		return
 	}
 
 	ownerMXID := ec.Config.OAuth2.OwnerMXID
@@ -53,13 +65,22 @@ func (ec *EmailConnector) runBackfill(ctx context.Context) {
 
 	var url string // empty = initial endpoint
 	total := 0
+	pages := 0
 
 	for {
+		// Fix 2: bounded page walk — guard against Graph returning the same
+		// nextLink repeatedly (infinite loop / stuck goroutine).
+		if pages >= maxDeltaPages {
+			log.Error().Int("pages", pages).Msg("Graph delta: backfill exceeded max page limit — aborting to prevent stuck goroutine")
+			return
+		}
+
 		msgs, removed, nextLink, deltaLink, err := ec.graphClient.DeltaPage(ctx, url)
 		if err != nil {
 			log.Error().Err(err).Msg("Graph delta: backfill DeltaPage failed")
 			return
 		}
+		pages++
 
 		log.Debug().
 			Int("msgs", len(msgs)).
@@ -68,10 +89,8 @@ func (ec *EmailConnector) runBackfill(ctx context.Context) {
 			Str("delta_link_set", boolStr(deltaLink != "")).
 			Msg("Graph delta: backfill page received")
 
-		if client != nil {
-			for _, msg := range msgs {
-				client.deliverGraphMessage(ctx, msg)
-			}
+		for _, msg := range msgs {
+			client.deliverGraphMessage(ctx, msg)
 		}
 		total += len(msgs)
 
@@ -98,6 +117,12 @@ func (ec *EmailConnector) runBackfill(ctx context.Context) {
 		if nextLink == "" {
 			// Neither nextLink nor deltaLink — Graph returned an incomplete response.
 			log.Warn().Msg("Graph delta: backfill page had neither nextLink nor deltaLink — aborting")
+			return
+		}
+
+		// Fix 2: detect same-URL repeat before following, which would loop forever.
+		if nextLink == url {
+			log.Error().Str("url", url).Msg("Graph delta: backfill nextLink equals current URL — aborting to prevent infinite loop")
 			return
 		}
 
@@ -134,14 +159,25 @@ func (ec *EmailConnector) reconcile(ctx context.Context) {
 
 	client, clientErr := ec.lookupEmailClient()
 	if clientErr != nil {
-		log.Warn().Err(clientErr).Msg("Graph delta: cannot deliver during reconcile (client not ready)")
-		client = nil
+		// Client not ready — do NOT persist a new deltaLink. Advancing the
+		// delta cursor while skipping delivery causes permanent mail loss.
+		// The next trigger will retry from the same stored link.
+		log.Warn().Err(clientErr).Msg("Graph delta: email client not ready — not persisting deltaLink, will retry on next trigger")
+		return
 	}
 
 	url := gs.InboxDeltaLink
 	total := 0
+	pages := 0
 
 	for {
+		// Fix 2: bounded page walk — guard against Graph returning the same
+		// nextLink repeatedly (infinite loop / stuck goroutine).
+		if pages >= maxDeltaPages {
+			log.Error().Int("pages", pages).Msg("Graph delta: reconcile exceeded max page limit — aborting to prevent stuck goroutine")
+			return
+		}
+
 		msgs, removed, nextLink, deltaLink, err := ec.graphClient.DeltaPage(ctx, url)
 		if err != nil {
 			if errors.Is(err, graph.ErrDeltaResync) {
@@ -158,6 +194,7 @@ func (ec *EmailConnector) reconcile(ctx context.Context) {
 			log.Error().Err(err).Msg("Graph delta: reconcile DeltaPage failed")
 			return
 		}
+		pages++
 
 		log.Debug().
 			Int("msgs", len(msgs)).
@@ -166,10 +203,8 @@ func (ec *EmailConnector) reconcile(ctx context.Context) {
 			Str("delta_link_set", boolStr(deltaLink != "")).
 			Msg("Graph delta: reconcile page received")
 
-		if client != nil {
-			for _, msg := range msgs {
-				client.deliverGraphMessage(ctx, msg)
-			}
+		for _, msg := range msgs {
+			client.deliverGraphMessage(ctx, msg)
 		}
 		total += len(msgs)
 
@@ -186,6 +221,12 @@ func (ec *EmailConnector) reconcile(ctx context.Context) {
 
 		if nextLink == "" {
 			log.Warn().Msg("Graph delta: reconcile page had neither nextLink nor deltaLink — aborting")
+			return
+		}
+
+		// Fix 2: detect same-URL repeat before following, which would loop forever.
+		if nextLink == url {
+			log.Error().Str("url", url).Msg("Graph delta: reconcile nextLink equals current URL — aborting to prevent infinite loop")
 			return
 		}
 
