@@ -349,6 +349,9 @@ func (ec *EmailConnector) Start(ctx context.Context) error {
 	// missing (disable with EMAILDAWG_SELFHEAL=off).
 	go ec.selfHealLoop(ctx)
 
+	// One-shot clean inbox rebuild (EMAILDAWG_REBUILD_INBOX=1). No-op unless set.
+	go ec.forceRebuildInbox(ctx)
+
 	return nil
 }
 
