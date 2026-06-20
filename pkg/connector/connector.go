@@ -322,7 +322,10 @@ func (ec *EmailConnector) Start(ctx context.Context) error {
 	// Start the dedicated webhook HTTP server. It must be up before we call
 	// ensureGraphSubscription so that Graph can reach the endpoint during the
 	// subscription-validation handshake.
-	ec.startGraphWebhookServer(ctx)
+	if err := ec.startGraphWebhookServer(ctx); err != nil {
+		ec.Bridge.Log.Warn().Err(err).Msg("Graph webhook server failed to start; skipping Graph subscription")
+		return nil
+	}
 
 	// Create or reuse the Graph subscription (random clientState, persisted,
 	// renewal goroutine). This is a no-op when OAuth2 is not configured.

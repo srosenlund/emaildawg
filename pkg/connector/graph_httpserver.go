@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"net/http"
+	"time"
 )
 
 const graphWebhookPort = "29319"
@@ -21,7 +22,8 @@ const graphWebhookPort = "29319"
 //	GET  /health                — belt-and-suspenders healthcheck → 200 OK
 //
 // The server shuts down cleanly when ctx is cancelled.
-func (ec *EmailConnector) startGraphWebhookServer(ctx context.Context) {
+// Returns an error if the port cannot be bound (caller should log and continue).
+func (ec *EmailConnector) startGraphWebhookServer(ctx context.Context) error {
 	log := ec.Bridge.Log.With().Str("component", "graph_httpserver").Logger()
 
 	mux := http.NewServeMux()
@@ -40,21 +42,32 @@ func (ec *EmailConnector) startGraphWebhookServer(ctx context.Context) {
 		Handler: mux,
 	}
 
+	// Bind the port synchronously so the caller can rely on :29319 being
+	// ready before ensureGraphSubscription fires the validation POST.
+	listener, err := net.Listen("tcp", net.JoinHostPort("0.0.0.0", graphWebhookPort))
+	if err != nil {
+		log.Error().Err(err).Msg("Graph webhook server: failed to bind port")
+		return err
+	}
+	log.Info().Str("addr", listener.Addr().String()).Msg("Graph webhook server listening on :29319")
+
 	// Shutdown the server when the context is cancelled.
 	go func() {
 		<-ctx.Done()
-		shutCtx := context.Background()
+		shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
 		if err := srv.Shutdown(shutCtx); err != nil {
 			log.Warn().Err(err).Msg("Graph webhook server: shutdown error")
 		}
 	}()
 
-	// Start listening in a goroutine so Start() is non-blocking.
+	// Serve on the already-bound listener in a goroutine so Start() is non-blocking.
 	go func() {
-		log.Info().Str("addr", srv.Addr).Msg("Graph webhook server listening")
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := srv.Serve(listener); err != nil && err != http.ErrServerClosed {
 			log.Error().Err(err).Msg("Graph webhook server exited with error")
 		}
 	}()
+
+	return nil
 }
 
