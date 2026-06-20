@@ -130,6 +130,14 @@ func (ec *EmailConnector) ensureGraphSubscription(ctx context.Context) {
 		Time("expiry", sub.ExpirationDateTime).
 		Msg("Graph subscription: created new subscription")
 
+	// On first ever subscription (no saved deltaLink), run a backfill to
+	// populate InboxDeltaLink and deliver historical messages. Subsequent
+	// subscription recreations (subscriptionRemoved) fall through to the
+	// lifecycle handler which calls reconcile instead.
+	if newGS.InboxDeltaLink == "" {
+		go ec.runBackfill(ctx)
+	}
+
 	go ec.runSubscriptionRenewal(ctx, ownerMXID, email, sub.ID, sub.ExpirationDateTime)
 }
 
@@ -265,18 +273,24 @@ func (ec *EmailConnector) handleLifecycleEvents(ctx context.Context, body []byte
 			}(item.SubscriptionID)
 
 		case "subscriptionRemoved":
-			// Graph removed our subscription — recreate it.
+			// Graph removed our subscription — recreate it and reconcile to
+			// catch up on any notifications we may have missed while the
+			// subscription was gone.
 			ec.Bridge.Log.Warn().
 				Str("subscription_id", item.SubscriptionID).
-				Msg("Graph lifecycle: subscriptionRemoved — recreating subscription")
-			go ec.ensureGraphSubscription(ctx)
+				Msg("Graph lifecycle: subscriptionRemoved — recreating subscription and reconciling delta")
+			go func() {
+				ec.ensureGraphSubscription(ctx)
+				ec.reconcile(ctx)
+			}()
 
 		case "missed":
-			// TODO (Task 6): wire delta reconcile here.
-			// ec.triggerDeltaReconcile(ctx) will catch up on missed notifications.
+			// Graph tells us it could not deliver some notifications — run a
+			// delta reconcile to catch up on what we missed.
 			ec.Bridge.Log.Warn().
 				Str("subscription_id", item.SubscriptionID).
-				Msg("Graph lifecycle: missed notifications — delta reconcile TODO (Task 6)")
+				Msg("Graph lifecycle: missed notifications — running delta reconcile")
+			go ec.reconcile(ctx)
 
 		default:
 			ec.Bridge.Log.Warn().
