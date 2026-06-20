@@ -1,0 +1,26 @@
+pkg/connector/graph_selfheal.go
+  s_b85fdc9b24e276::t_fd6070104fdd9c 13
+  s_b85fdc9b24e276::t_3fc49d8c06fd5d 111
+  s_b85fdc9b24e276::t_bea5e7b4f5aeaf 63,68
+  s_b85fdc9b24e276::t_3da2a7f22c3ce4 1-12,14-62,64-67,69-110,112-138
+pkg/connector/graph_selfheal_test.go
+  s_b85fdc9b24e276::t_ab444e5072dbd1 1-27
+pkg/connector/connector.go
+  s_b85fdc9b24e276::t_e61c494463c009 348-351
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "63ebb89211a35eeeb839b1237fc5c2da07c67773",
+  "prompts": {},
+  "sessions": {
+    "s_b85fdc9b24e276": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f0c16e0-5afb-482a-a505-6a89b59fb574",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
