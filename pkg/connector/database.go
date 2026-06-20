@@ -324,9 +324,25 @@ func (eaq *EmailAccountQuery) CreateTable(ctx context.Context) error {
 		ALTER TABLE email_accounts ADD COLUMN monitored_folders TEXT DEFAULT '["INBOX"]'
 	`)
 
+	// Create graph_state table (subscription + delta state per mailbox).
+	_, err = eaq.DB.Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS graph_state (
+			user_mxid           TEXT NOT NULL,
+			email               TEXT NOT NULL,
+			subscription_id     TEXT NOT NULL DEFAULT '',
+			subscription_expiry TEXT NOT NULL DEFAULT '',
+			client_state        TEXT NOT NULL DEFAULT '',
+			inbox_delta_link    TEXT NOT NULL DEFAULT '',
+			PRIMARY KEY (user_mxid, email)
+		)
+	`)
+	if err != nil {
+		return err
+	}
+
 	// Create performance indexes
 	_, err = eaq.DB.Exec(ctx, `
-		CREATE INDEX IF NOT EXISTS idx_email_accounts_user_created 
+		CREATE INDEX IF NOT EXISTS idx_email_accounts_user_created
 		ON email_accounts(user_mxid, created_at)
 	`)
 	if err != nil {
