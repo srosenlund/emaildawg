@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"maunium.net/go/mautrix/bridgev2"
+	"maunium.net/go/mautrix/bridgev2/database"
 	"maunium.net/go/mautrix/bridgev2/networkid"
 	"maunium.net/go/mautrix/bridgev2/status"
 	"maunium.net/go/mautrix/event"
@@ -576,11 +577,64 @@ func (ec *EmailClient) GetUserInfo(ctx context.Context, ghost *bridgev2.Ghost) (
 	return ec.Main.GetUserInfo(ctx, ghost)
 }
 
-// HandleMatrixMessage implements the NetworkAPI interface
+// HandleMatrixMessage implements the NetworkAPI interface: a Matrix message in
+// an email room is sent as a threaded reply (via Graph) to the email being
+// replied to — explicit ReplyTo if present, else the latest email in the thread.
+// Text-only in v1; messages without a text body are ignored (attachments TODO).
 func (ec *EmailClient) HandleMatrixMessage(ctx context.Context, msg *bridgev2.MatrixMessage) (*bridgev2.MatrixMessageResponse, error) {
-	// Email bridge is designed as read-only - Matrix users can view emails but not send replies
-	ec.UserLogin.Log.Warn().Msg("Received Matrix message for read-only email portal")
+	log := ec.UserLogin.Log
+	if ec.Main.graphClient == nil {
+		log.Warn().Msg("Matrix message in email room but Graph not configured; ignoring")
+		return &bridgev2.MatrixMessageResponse{DB: nil}, nil
+	}
+	if msg.Content == nil || strings.TrimSpace(msg.Content.Body) == "" {
+		log.Warn().Msg("Matrix message has no text body; ignoring (attachments not yet supported)")
+		return &bridgev2.MatrixMessageResponse{DB: nil}, nil
+	}
+
+	// Which email to reply to: explicit ReplyTo, else the latest email in the thread.
+	target := msg.ReplyTo
+	if target == nil {
+		parts, err := ec.Main.Bridge.DB.Message.GetLastNInPortal(ctx, msg.Portal.PortalKey, 1)
+		if err != nil {
+			return nil, fmt.Errorf("reply: load latest thread message: %w", err)
+		}
+		if len(parts) > 0 {
+			target = parts[0]
+		}
+	}
+	if target == nil {
+		log.Warn().Msg("reply: no email in thread to reply to; ignoring")
+		return &bridgev2.MatrixMessageResponse{DB: nil}, nil
+	}
+
+	internetID := strings.TrimPrefix(string(target.ID), "email:")
+	if internetID == string(target.ID) {
+		log.Warn().Str("target_id", string(target.ID)).Msg("reply: target id is not an email id; ignoring")
+		return &bridgev2.MatrixMessageResponse{DB: nil}, nil
+	}
+
+	graphID, err := ec.Main.graphClient.FindGraphIDByInternetID(ctx, internetID)
+	if err != nil {
+		return nil, fmt.Errorf("reply: resolve graph id: %w", err)
+	}
+	if graphID == "" {
+		log.Warn().Str("internet_id", internetID).Msg("reply: original email not found in Graph; ignoring")
+		return &bridgev2.MatrixMessageResponse{DB: nil}, nil
+	}
+
+	newID, err := ec.Main.graphClient.SendReply(ctx, graphID, msg.Content.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reply: send: %w", err)
+	}
+	log.Info().Str("reply_to", internetID).Str("new_id", newID).Msg("reply: sent via Graph")
+
 	return &bridgev2.MatrixMessageResponse{
-		DB: nil, // No database message entry needed for rejected message
+		DB: &database.Message{
+			ID:        networkid.MessageID("email:reply:" + newID),
+			Room:      msg.Portal.PortalKey,
+			SenderID:  networkid.UserID("email:" + ec.Email),
+			Timestamp: time.Now(),
+		},
 	}, nil
 }

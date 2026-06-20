@@ -315,3 +315,73 @@ func (c *Client) ListRecentInbox(ctx context.Context, top int) ([]InboxRef, erro
 	}
 	return refs, nil
 }
+
+// SendReply sends a text reply to origMsgID using the createReply→PATCH→send
+// flow: createReply produces a draft with threading + recipients pre-filled,
+// PATCH sets the reply body, send dispatches it. Returns the draft (Graph) id
+// for mapping. Same token/Prefer pattern as SetRead. Non-2xx → error with body.
+func (c *Client) SendReply(ctx context.Context, origMsgID, bodyText string) (string, error) {
+	token, err := c.tp.Token(ctx)
+	if err != nil {
+		return "", fmt.Errorf("graph SendReply: acquire token: %w", err)
+	}
+	hdr := func(req *http.Request) {
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Add("Prefer", `IdType="ImmutableId"`)
+		req.Header.Set("Content-Type", "application/json")
+	}
+	do := func(method, u string, payload []byte) ([]byte, int, error) {
+		req, err := http.NewRequestWithContext(ctx, method, u, bytes.NewReader(payload))
+		if err != nil {
+			return nil, 0, err
+		}
+		hdr(req)
+		resp, err := c.httpc.Do(req)
+		if err != nil {
+			return nil, 0, err
+		}
+		defer resp.Body.Close()
+		body, err := io.ReadAll(resp.Body)
+		return body, resp.StatusCode, err
+	}
+
+	// 1. createReply → draft id
+	createURL := fmt.Sprintf("%s/users/%s/messages/%s/createReply", c.base(), c.userID, url.PathEscape(origMsgID))
+	body, status, err := do(http.MethodPost, createURL, []byte("{}"))
+	if err != nil {
+		return "", fmt.Errorf("graph SendReply: createReply: %w", err)
+	}
+	if status < 200 || status >= 300 {
+		return "", fmt.Errorf("graph SendReply: createReply status %d: %s", status, body)
+	}
+	var draft struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(body, &draft); err != nil || draft.ID == "" {
+		return "", fmt.Errorf("graph SendReply: parse draft id (body: %s): %w", body, err)
+	}
+
+	// 2. PATCH body
+	patchPayload, _ := json.Marshal(map[string]any{
+		"body": map[string]string{"contentType": "text", "content": bodyText},
+	})
+	patchURL := fmt.Sprintf("%s/users/%s/messages/%s", c.base(), c.userID, url.PathEscape(draft.ID))
+	body, status, err = do(http.MethodPatch, patchURL, patchPayload)
+	if err != nil {
+		return "", fmt.Errorf("graph SendReply: patch draft: %w", err)
+	}
+	if status < 200 || status >= 300 {
+		return "", fmt.Errorf("graph SendReply: patch status %d: %s", status, body)
+	}
+
+	// 3. send
+	sendURL := fmt.Sprintf("%s/users/%s/messages/%s/send", c.base(), c.userID, url.PathEscape(draft.ID))
+	body, status, err = do(http.MethodPost, sendURL, []byte("{}"))
+	if err != nil {
+		return "", fmt.Errorf("graph SendReply: send: %w", err)
+	}
+	if status < 200 || status >= 300 {
+		return "", fmt.Errorf("graph SendReply: send status %d: %s", status, body)
+	}
+	return draft.ID, nil
+}
