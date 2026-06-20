@@ -1,0 +1,26 @@
+pkg/connector/connector.go
+  s_b85fdc9b24e276::t_74213a697555ae 410-428
+  s_b85fdc9b24e276::t_64de76bf2f3103 82-83,85
+pkg/connector/example-config.yaml
+  s_b85fdc9b24e276::t_3b964d1b994121 30-38
+pkg/connector/config.go
+  s_b85fdc9b24e276::t_286fe6533672c9 41-48
+  s_b85fdc9b24e276::t_67db0c5e57e16a 96-99
+  s_b85fdc9b24e276::t_45d8d6104ea1b9 16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "3baf41506c0aedbe2acab74c47832a1bc6495f7e",
+  "prompts": {},
+  "sessions": {
+    "s_b85fdc9b24e276": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f0c16e0-5afb-482a-a505-6a89b59fb574",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
