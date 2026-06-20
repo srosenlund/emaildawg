@@ -27,6 +27,15 @@ oauth2:
     owner_mxid: ""
     auto_login_folders: ["INBOX"]
 
+# Graph read-path toggle.
+# When enabled, incoming mail is delivered via Microsoft Graph change
+# notifications (webhooks) + delta backfill instead of IMAP IDLE polling.
+# Requires oauth2.enabled=true and a public appservice.public_address so
+# Graph can reach the validation/notification endpoint. Set to false (default)
+# to use classic IMAP polling.
+graph:
+    enabled: false
+
 # Logging configuration
 logging:
     # Sanitize PII from logs (recommended for production)

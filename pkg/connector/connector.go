@@ -79,9 +79,10 @@ func (ec *EmailConnector) Init(bridge *bridgev2.Bridge) {
 
 	ec.Config = Config{
 		IMAP: imapConfig,
-		// Preserve any already-parsed network config (oauth2 etc.) — Init must
-		// not clobber it back to zero-values.
+		// Preserve any already-parsed config (oauth2, graph etc.) — Init must
+		// not clobber them back to zero-values.
 		OAuth2: ec.Config.OAuth2,
+		Graph:  ec.Config.Graph,
 		Network: NetworkConfig{
 			IMAP: imapConfig, // Keep Network.IMAP populated for backward compatibility
 		},
@@ -404,6 +405,25 @@ func (ec *EmailConnector) autoLogin(ctx context.Context) error {
 	owner, err := ec.Bridge.GetUserByMXID(ctx, id.UserID(cfg.OwnerMXID))
 	if err != nil {
 		return fmt.Errorf("get owner user %q: %w", cfg.OwnerMXID, err)
+	}
+
+	// When the Graph read-path is active, skip IMAP AddAccount / IDLE polling.
+	// The Graph webhook + delta backfill (wired in Start()) handle mail delivery
+	// instead. We still need the bridgev2 UserLogin to exist so that
+	// processWebhookItem can look it up via GetCachedUserLoginByID.
+	if ec.Config.Graph.Enabled {
+		log.Info().Msg("Auto-login: graph.enabled=true — skipping IMAP AddAccount; Graph read-path handles delivery")
+		loginID := networkid.UserLoginID(fmt.Sprintf("email:%s", cfg.AutoLoginEmail))
+		_, err = owner.NewLogin(ctx, &database.UserLogin{
+			ID:         loginID,
+			RemoteName: cfg.AutoLoginEmail,
+			Metadata:   &EmailLoginMetadata{Email: cfg.AutoLoginEmail, Username: cfg.AutoLoginEmail},
+		}, &bridgev2.NewLoginParams{DeleteOnConflict: false})
+		if err != nil {
+			return fmt.Errorf("create login (graph mode): %w", err)
+		}
+		log.Info().Msg("Auto-login: UserLogin created for Graph read-path")
+		return nil
 	}
 
 	folders := cfg.AutoLoginFolders

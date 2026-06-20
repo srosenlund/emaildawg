@@ -13,6 +13,7 @@ type Config struct {
 	// Top-level blocks to match example-config.yaml structure
 	IMAP       IMAPConfig        `yaml:"imap"`
 	OAuth2     OAuth2Config      `yaml:"oauth2"`
+	Graph      GraphConfig       `yaml:"graph"`
 	Logging    LoggingConfig     `yaml:"logging"`
 	Processing ProcessingConfig  `yaml:"email_processing"`
 	// Keep Network for internal use but don't map to YAML
@@ -35,6 +36,14 @@ type OAuth2Config struct {
 	AutoLoginEmail   string   `yaml:"auto_login_email"`
 	OwnerMXID        string   `yaml:"owner_mxid"`
 	AutoLoginFolders []string `yaml:"auto_login_folders"`
+}
+
+// GraphConfig enables the Microsoft Graph read-path (webhook + delta backfill)
+// as an alternative to the IMAP polling path. When Enabled is true, the bridge
+// skips the IMAP AddAccount / IDLE polling for the auto-login mailbox and relies
+// on Graph change notifications + delta backfill instead.
+type GraphConfig struct {
+	Enabled bool `yaml:"enabled"`
 }
 
 type NetworkConfig struct {
@@ -84,7 +93,10 @@ func upgradeConfig(helper up.Helper) {
 	helper.Copy(up.Str, "oauth2", "auto_login_email")
 	helper.Copy(up.Str, "oauth2", "owner_mxid")
 	helper.Copy(up.List, "oauth2", "auto_login_folders")
-	
+
+	// Graph read-path toggle
+	helper.Copy(up.Bool, "graph", "enabled")
+
 	// Email processing configuration
 	helper.Copy(up.Int, "email_processing", "max_upload_bytes")
 	helper.Copy(up.Bool, "email_processing", "gzip_large_bodies")
