@@ -300,13 +300,11 @@ func (ec *EmailConnector) Start(ctx context.Context) error {
 		ec.graphClient = graph.NewClient(tp, ec.Config.OAuth2.AutoLoginEmail)
 	}
 
-	// clientState is used to validate incoming notifications. In a later task it
-	// will be written into the subscription payload. For now derive it from the
-	// OAuth2 client secret or fall back to a stable placeholder.
-	ec.graphClientState = ec.Config.OAuth2.ClientSecret
-	if ec.graphClientState == "" {
-		ec.graphClientState = "emaildawg-graph-clientstate"
-	}
+	// graphClientState will be set by ensureGraphSubscription to the randomly
+	// generated clientState persisted in the graph_state table. Initialise to
+	// an empty sentinel here — the webhook handler will discard anything that
+	// does not match the value set by ensureGraphSubscription.
+	ec.graphClientState = ""
 
 	// Buffered channel to decouple the HTTP handler (must respond in 3s) from
 	// the blocking GetMessage + deliver work.
@@ -315,8 +313,13 @@ func (ec *EmailConnector) Start(ctx context.Context) error {
 	// Background worker: drain the queue, fetch each message, deliver.
 	go ec.runWebhookWorker(ctx)
 
-	router.HandleFunc("POST /_email/graph/webhook", ec.handleGraphWebhook)
+	// Register the unified webhook+lifecycle handler.
+	router.HandleFunc("POST /_email/graph/webhook", ec.handleGraphWebhookFull)
 	ec.Bridge.Log.Info().Msg("Graph webhook endpoint registered at POST /_email/graph/webhook")
+
+	// Create or reuse the Graph subscription (random clientState, persisted,
+	// renewal goroutine). This is a no-op when OAuth2 is not configured.
+	ec.ensureGraphSubscription(ctx)
 
 	return nil
 }
