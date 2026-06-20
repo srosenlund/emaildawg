@@ -20,6 +20,7 @@ import (
 	"maunium.net/go/mautrix/bridgev2/commands"
 	"maunium.net/go/mautrix/bridgev2/database"
 	"maunium.net/go/mautrix/bridgev2/networkid"
+	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/id"
 )
 
@@ -587,8 +588,16 @@ func (ec *EmailConnector) GetChatInfo(ctx context.Context, portal *bridgev2.Port
 	roomName := fmt.Sprintf("Email Thread: %s", threadID)
 	roomTopic := "Email thread - messages will appear here when emails are received"
 
-	// Start with empty member list - participants will be added when emails are processed
-	chatMembers := make([]bridgev2.ChatMember, 0)
+	// Include the Matrix user as an auto-joined member (IsFromMe) so the room is
+	// auto-joined at creation (Beeper BeeperInitialMembers) instead of leaving the
+	// user uninvited. An uninvited user sits at power level 0 and cannot self-join,
+	// so the later membership=join PUT 403s and the room never surfaces in Beeper.
+	// Mirrors RoomManager.GetChatInfoForThread (the path that already works).
+	selfMember := bridgev2.ChatMember{
+		EventSender: bridgev2.EventSender{IsFromMe: true},
+		Membership:  event.MembershipJoin,
+		// PowerLevel intentionally omitted (defaults to 0) to keep the room read-only.
+	}
 
 	chatInfo := &bridgev2.ChatInfo{
 		Name:   &roomName,
@@ -596,8 +605,10 @@ func (ec *EmailConnector) GetChatInfo(ctx context.Context, portal *bridgev2.Port
 		Avatar: nil,
 		Type:   ptr.Ptr(database.RoomTypeDefault),
 		Members: &bridgev2.ChatMemberList{
-			Members: chatMembers,
-			IsFull:  true,
+			IsFull:           true,
+			TotalMemberCount: 1,
+			Members:          []bridgev2.ChatMember{selfMember},
+			MemberMap:        map[networkid.UserID]bridgev2.ChatMember{networkid.UserID(""): selfMember},
 		},
 	}
 
