@@ -1,0 +1,24 @@
+docs/superpowers/plans/2026-06-20-graph-reply-phase4.md
+  s_b85fdc9b24e276::t_6afcea84a65c38 1-60
+pkg/connector/client.go
+  s_b85fdc9b24e276::t_ec0c6eb7a51ef7 12
+  s_b85fdc9b24e276::t_7ffe3f01cd82c4 580-583,585-631,633-638
+pkg/graph/client_reply_test.go
+  s_b85fdc9b24e276::t_f9cd52aed7fe06 1-81
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "9b092b85616cac5274725cfb7fe63f7564074783",
+  "prompts": {},
+  "sessions": {
+    "s_b85fdc9b24e276": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f0c16e0-5afb-482a-a505-6a89b59fb574",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
