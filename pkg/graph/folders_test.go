@@ -4,14 +4,16 @@ import "testing"
 
 func TestClassifyRemoval(t *testing.T) {
 	const (
-		archiveID = "FOLDER_ARCHIVE"
-		deletedID = "FOLDER_DELETED"
+		archiveID   = "FOLDER_ARCHIVE"
+		deletedID   = "FOLDER_DELETED"
+		deletionsID = "FOLDER_DELETIONS" // Recoverable Items\Deletions
 	)
+	deleteIDs := []string{deletedID, deletionsID}
 	tests := []struct {
 		name           string
 		parentFolderID string
 		archiveID      string
-		deletedID      string
+		deleteIDs      []string
 		notFound       bool
 		want           RemovalKind
 	}{
@@ -19,14 +21,21 @@ func TestClassifyRemoval(t *testing.T) {
 			name:           "in archive folder",
 			parentFolderID: archiveID,
 			archiveID:      archiveID,
-			deletedID:      deletedID,
+			deleteIDs:      deleteIDs,
 			want:           RemovalArchive,
 		},
 		{
 			name:           "in deleted items folder",
 			parentFolderID: deletedID,
 			archiveID:      archiveID,
-			deletedID:      deletedID,
+			deleteIDs:      deleteIDs,
+			want:           RemovalDelete,
+		},
+		{
+			name:           "in recoverable-items deletions folder (Graph DELETE)",
+			parentFolderID: deletionsID,
+			archiveID:      archiveID,
+			deleteIDs:      deleteIDs,
 			want:           RemovalDelete,
 		},
 		{
@@ -38,7 +47,7 @@ func TestClassifyRemoval(t *testing.T) {
 			name:           "not found wins over a matching archive folder",
 			parentFolderID: archiveID,
 			archiveID:      archiveID,
-			deletedID:      deletedID,
+			deleteIDs:      deleteIDs,
 			notFound:       true,
 			want:           RemovalDelete,
 		},
@@ -46,31 +55,31 @@ func TestClassifyRemoval(t *testing.T) {
 			name:           "moved to a custom folder is unknown",
 			parentFolderID: "SOME_OTHER_FOLDER",
 			archiveID:      archiveID,
-			deletedID:      deletedID,
+			deleteIDs:      deleteIDs,
 			want:           RemovalUnknown,
 		},
 		{
 			name:           "empty archive id never matches empty parent folder",
 			parentFolderID: "",
 			archiveID:      "",
-			deletedID:      deletedID,
+			deleteIDs:      deleteIDs,
 			want:           RemovalUnknown,
 		},
 		{
-			name:           "empty deleted id never matches empty parent folder",
+			name:           "empty delete ids never match empty parent folder",
 			parentFolderID: "",
 			archiveID:      archiveID,
-			deletedID:      "",
+			deleteIDs:      nil,
 			want:           RemovalUnknown,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ClassifyRemoval(tt.parentFolderID, tt.archiveID, tt.deletedID, tt.notFound)
+			got := ClassifyRemoval(tt.parentFolderID, tt.archiveID, tt.deleteIDs, tt.notFound)
 			if got != tt.want {
-				t.Errorf("ClassifyRemoval(%q, %q, %q, %v) = %v, want %v",
-					tt.parentFolderID, tt.archiveID, tt.deletedID, tt.notFound, got, tt.want)
+				t.Errorf("ClassifyRemoval(%q, %q, %v, %v) = %v, want %v",
+					tt.parentFolderID, tt.archiveID, tt.deleteIDs, tt.notFound, got, tt.want)
 			}
 		})
 	}

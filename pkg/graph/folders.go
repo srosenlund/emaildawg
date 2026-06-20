@@ -42,29 +42,31 @@ func (k RemovalKind) String() string {
 }
 
 // ClassifyRemoval is a pure function that decides what a delta @removed item
-// means, given the removed message's current parentFolderId and the resolved
-// ids of the Archive and Deleted Items well-known folders.
+// means, given the removed message's current parentFolderId, the resolved id of
+// the Archive folder, and the resolved ids of the delete-destination folders.
 //
 //   - parentFolderID == archiveFolderID                 → RemovalArchive
-//   - parentFolderID == deletedFolderID                 → RemovalDelete
+//   - parentFolderID ∈ deleteFolderIDs                  → RemovalDelete
 //   - notFound (message gone, 404)                       → RemovalDelete
 //   - anything else (e.g. moved to a custom folder)      → RemovalUnknown
 //
-// archiveFolderID / deletedFolderID may be empty if resolution failed; an empty
-// well-known id never matches a real parentFolderID, so the function degrades to
-// RemovalUnknown rather than guessing.
-func ClassifyRemoval(parentFolderID, archiveFolderID, deletedFolderID string, notFound bool) RemovalKind {
+// deleteFolderIDs covers both "Deleted Items" (Outlook-client delete) and
+// "Recoverable Items\Deletions" (Graph DELETE / retention) — a delete can land
+// in either depending on how it was issued. Empty ids never match a real
+// parentFolderID, so the function degrades to RemovalUnknown rather than guessing.
+func ClassifyRemoval(parentFolderID, archiveFolderID string, deleteFolderIDs []string, notFound bool) RemovalKind {
 	if notFound {
 		return RemovalDelete
 	}
-	switch {
-	case archiveFolderID != "" && parentFolderID == archiveFolderID:
+	if archiveFolderID != "" && parentFolderID == archiveFolderID {
 		return RemovalArchive
-	case deletedFolderID != "" && parentFolderID == deletedFolderID:
-		return RemovalDelete
-	default:
-		return RemovalUnknown
 	}
+	for _, d := range deleteFolderIDs {
+		if d != "" && parentFolderID == d {
+			return RemovalDelete
+		}
+	}
+	return RemovalUnknown
 }
 
 // ResolveWellKnownFolderID resolves a Graph well-known folder name (e.g.

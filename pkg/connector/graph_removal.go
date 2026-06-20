@@ -23,18 +23,21 @@ type folderIDCache struct {
 	mu        sync.Mutex
 	resolved  bool
 	archiveID string
-	deletedID string
+	deleteIDs []string
 }
 
 var removalFolders folderIDCache
 
-// resolveRemovalFolders resolves (once) the archive + deleteditems folder ids.
-// Returns the cached values; either may be empty if resolution failed.
-func (ec *EmailConnector) resolveRemovalFolders(ctx context.Context) (archiveID, deletedID string) {
+// resolveRemovalFolders resolves (once) the archive folder id and the
+// delete-destination folder ids. A delete can land in "Deleted Items"
+// (Outlook-client delete) or "Recoverable Items\Deletions"
+// (recoverableitemsdeletions — Graph DELETE / retention), so both are resolved.
+// Returns the cached values; any may be empty if resolution failed.
+func (ec *EmailConnector) resolveRemovalFolders(ctx context.Context) (archiveID string, deleteIDs []string) {
 	removalFolders.mu.Lock()
 	defer removalFolders.mu.Unlock()
 	if removalFolders.resolved {
-		return removalFolders.archiveID, removalFolders.deletedID
+		return removalFolders.archiveID, removalFolders.deleteIDs
 	}
 	log := ec.Bridge.Log.With().Str("component", "graph_removal").Logger()
 	if id, err := ec.graphClient.ResolveWellKnownFolderID(ctx, "archive"); err != nil {
@@ -42,13 +45,15 @@ func (ec *EmailConnector) resolveRemovalFolders(ctx context.Context) (archiveID,
 	} else {
 		removalFolders.archiveID = id
 	}
-	if id, err := ec.graphClient.ResolveWellKnownFolderID(ctx, "deleteditems"); err != nil {
-		log.Warn().Err(err).Msg("Graph removal: could not resolve Deleted Items folder id (delete detection degraded)")
-	} else {
-		removalFolders.deletedID = id
+	for _, name := range []string{"deleteditems", "recoverableitemsdeletions"} {
+		if id, err := ec.graphClient.ResolveWellKnownFolderID(ctx, name); err != nil {
+			log.Warn().Err(err).Str("folder", name).Msg("Graph removal: could not resolve delete folder id (delete detection degraded)")
+		} else if id != "" {
+			removalFolders.deleteIDs = append(removalFolders.deleteIDs, id)
+		}
 	}
 	removalFolders.resolved = true
-	return removalFolders.archiveID, removalFolders.deletedID
+	return removalFolders.archiveID, removalFolders.deleteIDs
 }
 
 // handleRemovals processes the @removed graph-ids reported by a delta page.
@@ -63,7 +68,7 @@ func (ec *EmailConnector) handleRemovals(ctx context.Context, client *EmailClien
 		return
 	}
 	log := ec.Bridge.Log.With().Str("component", "graph_removal").Logger()
-	archiveID, deletedID := ec.resolveRemovalFolders(ctx)
+	archiveID, deleteIDs := ec.resolveRemovalFolders(ctx)
 
 	for _, graphID := range removed {
 		msg, err := ec.graphClient.GetMessage(ctx, graphID)
@@ -81,7 +86,7 @@ func (ec *EmailConnector) handleRemovals(ctx context.Context, client *EmailClien
 			internetID = msg.InternetMessageID
 		}
 
-		kind := graph.ClassifyRemoval(parentFolderID, archiveID, deletedID, notFound)
+		kind := graph.ClassifyRemoval(parentFolderID, archiveID, deleteIDs, notFound)
 
 		// Suppression: if we initiated this archive/delete from Beeper→Outlook
 		// (Flow 4/6, not built yet) we'd have suppressed internetID. Drop the
