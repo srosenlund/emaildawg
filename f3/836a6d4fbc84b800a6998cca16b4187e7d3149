@@ -1,0 +1,25 @@
+pkg/graph/folders.go
+  s_2684881a741748::t_c9c5df5fcadd22 45-46,49,53-57,61,64-69
+pkg/graph/folders_test.go
+  s_2684881a741748::t_fca57737f2f7fe 7-9,11,16,24,31-38,50,58,65,69,72,79,81-82
+pkg/connector/graph_removal.go
+  s_2684881a741748::t_2252e45660b628 89
+  s_2684881a741748::t_cbe19838a61d79 26,31-36,40,48-53,56
+  s_2684881a741748::t_ed4b5b455f2683 71
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "f3836a6d4fbc84b800a6998cca16b4187e7d3149",
+  "prompts": {},
+  "sessions": {
+    "s_2684881a741748": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7ca44acd-05a2-4083-b4c4-139c4c329cc4",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
