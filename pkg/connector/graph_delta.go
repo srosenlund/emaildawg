@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync/atomic"
+	"time"
 
 	"maunium.net/go/mautrix/bridgev2/networkid"
 
@@ -250,4 +252,32 @@ func boolStr(b bool) string {
 		return "true"
 	}
 	return "false"
+}
+
+const reconcileInterval = 5 * time.Minute
+
+var reconcileRunning atomic.Bool
+
+// reconcileLoop runs an incremental delta reconcile on a fixed cadence. The
+// webhook path delivers NEW inbox mail, but messages that LEAVE the inbox
+// (archived/deleted in Outlook → Flow 5/7) are only visible as @removed ids in a
+// delta page — and reconcile() is otherwise called only on rare lifecycle events
+// (subscriptionRemoved/missed). Without this loop, Outlook archive/delete would
+// never reflect into Beeper. The delta is incremental (from the saved deltaLink),
+// so each pass is cheap; deliverGraphMessage dedups so no double delivery.
+func (ec *EmailConnector) reconcileLoop(ctx context.Context) {
+	ticker := time.NewTicker(reconcileInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if !reconcileRunning.CompareAndSwap(false, true) {
+				continue // previous reconcile still running; skip this tick
+			}
+			ec.reconcile(ctx)
+			reconcileRunning.Store(false)
+		}
+	}
 }

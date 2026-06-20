@@ -357,6 +357,10 @@ func (ec *EmailConnector) Start(ctx context.Context) error {
 	// rooms aren't reliably auto-joined on Beeper (disable with EMAILDAWG_JOINHEAL=off).
 	go ec.ensureJoinedLoop(ctx)
 
+	// Periodic incremental delta reconcile — catches messages that left the inbox
+	// (Outlook archive/delete → Flow 5/7) which the webhook path doesn't surface.
+	go ec.reconcileLoop(ctx)
+
 	return nil
 }
 
