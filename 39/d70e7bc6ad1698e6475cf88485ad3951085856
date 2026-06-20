@@ -1,0 +1,24 @@
+pkg/connector/graph_subscription.go
+  s_b85fdc9b24e276::t_79380e70a60c94 89-94
+  s_b85fdc9b24e276::t_199ad2e0d7287b 148-156
+  s_b85fdc9b24e276::t_86dcb4791053d1 10
+pkg/connector/graph_delta.go
+  s_b85fdc9b24e276::t_d57b45e7ccd897 94-96
+  s_b85fdc9b24e276::t_43126504de775a 211-213
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "39d70e7bc6ad1698e6475cf88485ad3951085856",
+  "prompts": {},
+  "sessions": {
+    "s_b85fdc9b24e276": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f0c16e0-5afb-482a-a505-6a89b59fb574",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
