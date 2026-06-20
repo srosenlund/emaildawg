@@ -1,0 +1,33 @@
+pkg/connector/connector.go
+  s_b85fdc9b24e276::t_219aa3d6d852c3 26
+  s_b85fdc9b24e276::t_243741d0f07604 462-468
+  s_b85fdc9b24e276::t_ca50234a0e5874 47-48
+  s_b85fdc9b24e276::t_df15b225c68a88 9
+  s_b85fdc9b24e276::t_ceafa501173e13 307,309
+pkg/connector/graph_subscription.go
+  s_b85fdc9b24e276::t_8d46677b3267a9 206
+  s_b85fdc9b24e276::t_9626694dbcb78c 325,327
+  s_b85fdc9b24e276::t_d18ec413a67356 263
+  s_b85fdc9b24e276::t_c6727eff04ff88 81,83
+  s_b85fdc9b24e276::t_795e6c1ac6720e 136-157,183-184
+  s_b85fdc9b24e276::t_362905bb28e32a 123-125
+  s_b85fdc9b24e276::t_ccb3a3fd652c06 292-295
+  s_b85fdc9b24e276::t_de58a539ab55f3 240
+  s_b85fdc9b24e276::t_e0fc37f668a78f 105,107
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "4f6de30aa6f6aec43f23ee79b3873b4bf80ecd9f",
+  "prompts": {},
+  "sessions": {
+    "s_b85fdc9b24e276": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f0c16e0-5afb-482a-a505-6a89b59fb574",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
