@@ -1,0 +1,72 @@
+package graph
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"net/http"
+	"time"
+)
+
+const graphBaseURL = "https://graph.microsoft.com/v1.0"
+
+// Client is a Microsoft Graph API client scoped to a single mailbox.
+type Client struct {
+	tp     *TokenProvider
+	userID string
+	httpc  *http.Client
+}
+
+// NewClient returns a Client that fetches tokens from tp and operates on the
+// mailbox identified by userID (the UPN, e.g. "mail@example.com").
+func NewClient(tp *TokenProvider, userID string) *Client {
+	return &Client{
+		tp:     tp,
+		userID: userID,
+		httpc:  &http.Client{Timeout: 30 * time.Second},
+	}
+}
+
+// GetMessage fetches a single message by Graph message ID from the client's
+// mailbox. It sends two Prefer headers:
+//   - Prefer: IdType="ImmutableId"   (stable immutable message IDs)
+//   - Prefer: outlook.body-content-type="text"  (plain-text body)
+//
+// Non-200 responses are returned as an error that includes the response body.
+func (c *Client) GetMessage(ctx context.Context, id string) (*GraphMessage, error) {
+	token, err := c.tp.Token(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("graph GetMessage: acquire token: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/users/%s/messages/%s", graphBaseURL, c.userID, id)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("graph GetMessage: build request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Add("Prefer", `IdType="ImmutableId"`)
+	req.Header.Add("Prefer", `outlook.body-content-type="text"`)
+
+	resp, err := c.httpc.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("graph GetMessage: http: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("graph GetMessage: read body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("graph GetMessage: status %d: %s", resp.StatusCode, body)
+	}
+
+	msg, err := parseGraphMessage(body)
+	if err != nil {
+		return nil, fmt.Errorf("graph GetMessage: parse: %w", err)
+	}
+	return msg, nil
+}
