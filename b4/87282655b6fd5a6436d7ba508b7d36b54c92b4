@@ -1,0 +1,27 @@
+pkg/connector/connector.go
+  s_b85fdc9b24e276::t_8c9dd37985830a 160-162
+  s_b85fdc9b24e276::t_15f0ac287b6b09 50-54
+pkg/connector/graph_suppress_test.go
+  s_b85fdc9b24e276::t_f4e22e2fcf0b9e 1-40
+pkg/connector/graph_suppress.go
+  s_b85fdc9b24e276::t_5925b2b74456f8 1-62
+pkg/graph/client.go
+  s_b85fdc9b24e276::t_49cacec000d596 74-117
+  s_b85fdc9b24e276::t_f925d13bc7e1c2 4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "b487282655b6fd5a6436d7ba508b7d36b54c92b4",
+  "prompts": {},
+  "sessions": {
+    "s_b85fdc9b24e276": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f0c16e0-5afb-482a-a505-6a89b59fb574",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
