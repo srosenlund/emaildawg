@@ -33,6 +33,34 @@ func TestValidationResponse_WithToken(t *testing.T) {
 	}
 }
 
+// TestValidationResponse_PercentLiteralToken verifies that a token containing a
+// literal '%25' sequence (i.e. a URL-encoded percent sign) is not double-decoded.
+// Microsoft Graph sends validation tokens that may include URL-encoded characters.
+// r.URL.Query().Get() performs exactly one URL-decode; a second url.QueryUnescape
+// call would corrupt the value by decoding '%25' → '%' a second time.
+//
+// URL encoding:  validationToken=100%252525off
+// After 1 decode (net/http):    "100%2525off"
+// After 2nd decode (old bug):   "100%25off"   ← wrong, corrupts token
+// With fix (no 2nd decode):     "100%2525off" ← correct, preserves the value
+func TestValidationResponse_PercentLiteralToken(t *testing.T) {
+	// %2525 in the URL encodes a literal "%25" in the query value after one decode.
+	req := httptest.NewRequest(http.MethodPost, "/_email/graph/webhook?validationToken=100%2525off", nil)
+	w := httptest.NewRecorder()
+
+	got := ValidationResponse(w, req)
+
+	if !got {
+		t.Fatal("ValidationResponse should return true when validationToken present")
+	}
+	body := w.Body.String()
+	// net/http decodes %2525 → %25 (one pass). The body must preserve that exactly.
+	// A buggy second url.QueryUnescape would further decode %25 → %, corrupting the token.
+	if body != "100%25off" {
+		t.Fatalf("expected body %q (single-decode, no corruption), got %q", "100%25off", body)
+	}
+}
+
 // TestValidationResponse_NoToken verifies that ValidationResponse returns false
 // and writes nothing when no validationToken parameter is present.
 func TestValidationResponse_NoToken(t *testing.T) {

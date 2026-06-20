@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/url"
 )
 
 // NotificationItem represents a single change notification from Microsoft Graph.
@@ -32,16 +31,12 @@ func ValidationResponse(w http.ResponseWriter, r *http.Request) bool {
 	if token == "" {
 		return false
 	}
-	// The token arrives URL-encoded in the query string; net/http already
-	// decodes query params, so token is already decoded here.
-	decoded, err := url.QueryUnescape(token)
-	if err != nil {
-		// Fallback: use the raw (already partially decoded) value.
-		decoded = token
-	}
+	// r.URL.Query().Get() already returns the URL-decoded value; writing it
+	// directly avoids a double-decode that would corrupt tokens containing a
+	// literal '%' character.
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprint(w, decoded)
+	fmt.Fprint(w, token)
 	return true
 }
 

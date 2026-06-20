@@ -26,7 +26,8 @@ import (
 
 // webhookItem is enqueued by handleGraphWebhook for background processing.
 type webhookItem struct {
-	messageID string
+	messageID  string
+	changeType string // e.g. "created", "updated", "deleted" — carried for Task 4
 }
 
 type EmailConnector struct {
@@ -361,7 +362,7 @@ func (ec *EmailConnector) handleGraphWebhook(w http.ResponseWriter, r *http.Requ
 			continue
 		}
 		select {
-		case ec.webhookQueue <- webhookItem{messageID: msgID}:
+		case ec.webhookQueue <- webhookItem{messageID: msgID, changeType: item.ChangeType}:
 		default:
 			ec.Bridge.Log.Warn().Str("message_id", msgID).Msg("Graph webhook: queue full, dropping message")
 		}
@@ -403,6 +404,7 @@ func (ec *EmailConnector) processWebhookItem(ctx context.Context, item webhookIt
 
 	// Locate the UserLogin for the auto-login mailbox and deliver via the first
 	// matching EmailClient. Full multi-account routing comes in Task 4.
+	// Format must stay in sync with autoLogin(), which uses the same "email:<addr>" pattern.
 	loginID := networkid.UserLoginID(fmt.Sprintf("email:%s", ec.Config.OAuth2.AutoLoginEmail))
 	login := ec.Bridge.GetCachedUserLoginByID(loginID)
 	if login == nil {
