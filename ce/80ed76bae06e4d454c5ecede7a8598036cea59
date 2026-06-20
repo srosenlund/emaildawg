@@ -1,0 +1,23 @@
+pkg/graph/message_test.go
+  s_b85fdc9b24e276::t_2fd97d7c9750c4 1-49
+pkg/graph/message.go
+  s_b85fdc9b24e276::t_8d2d080888e17e 1-95
+pkg/graph/client.go
+  s_b85fdc9b24e276::t_2c17c13abbfb73 1-72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "ce80ed76bae06e4d454c5ecede7a8598036cea59",
+  "prompts": {},
+  "sessions": {
+    "s_b85fdc9b24e276": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f0c16e0-5afb-482a-a505-6a89b59fb574",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
