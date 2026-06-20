@@ -1,0 +1,22 @@
+pkg/connector/graph_deliver.go
+  s_b85fdc9b24e276::t_573ab9b4bc54b5 5
+  s_b85fdc9b24e276::t_6b0d420a1182ae 57-79
+pkg/connector/connector.go
+  s_b85fdc9b24e276::t_e8ff104ba87b63 365-370,397-415
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "3940fdeed90dcdf805d5b24c0fca37d42aa0ea76",
+  "prompts": {},
+  "sessions": {
+    "s_b85fdc9b24e276": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f0c16e0-5afb-482a-a505-6a89b59fb574",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
