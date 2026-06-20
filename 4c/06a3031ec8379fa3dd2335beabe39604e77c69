@@ -1,0 +1,24 @@
+pkg/connector/graph_deliver.go
+  s_b85fdc9b24e276::t_d51957b627b05a 7,9
+  s_b85fdc9b24e276::t_dbcd27e89118a8 60-83,85-97,99-119,121-138
+pkg/connector/graph_poll.go
+  s_b85fdc9b24e276::t_ee7b0a8995b9bf 1-28
+pkg/connector/graph_poll_test.go
+  s_b85fdc9b24e276::t_e83343f76ec096 1-63
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "4c06a3031ec8379fa3dd2335beabe39604e77c69",
+  "prompts": {},
+  "sessions": {
+    "s_b85fdc9b24e276": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f0c16e0-5afb-482a-a505-6a89b59fb574",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
