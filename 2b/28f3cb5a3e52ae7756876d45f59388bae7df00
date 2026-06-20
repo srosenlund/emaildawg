@@ -1,0 +1,25 @@
+pkg/connector/graph_archive_delete.go
+  s_b85fdc9b24e276::t_f07be8168de6ab 1-60
+pkg/graph/client.go
+  s_b85fdc9b24e276::t_70dec46c172ab4 19-22,29-32,36-42
+pkg/connector/connector.go
+  s_b85fdc9b24e276::t_d7ffc4ddfcec1f 61-62
+pkg/graph/client_move_test.go
+  s_b85fdc9b24e276::t_c417de6b9042a7 1-87
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "2b28f3cb5a3e52ae7756876d45f59388bae7df00",
+  "prompts": {},
+  "sessions": {
+    "s_b85fdc9b24e276": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f0c16e0-5afb-482a-a505-6a89b59fb574",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
