@@ -52,6 +52,7 @@ func (ec *EmailConnector) ensureAllPortalsJoined(ctx context.Context) {
 		return // no double puppet (IMAP mode); nothing to do
 	}
 	log := ec.Bridge.Log.With().Str("component", "graph_joinheal").Logger()
+	userID := client.UserLogin.UserMXID
 	portals, err := ec.Bridge.GetAllPortalsWithMXID(ctx)
 	if err != nil {
 		log.Warn().Err(err).Msg("join-heal: failed to list portals")
@@ -61,6 +62,12 @@ func (ec *EmailConnector) ensureAllPortalsJoined(ctx context.Context) {
 	for _, p := range portals {
 		if p.MXID == "" {
 			continue
+		}
+		// The double puppet joins via an m.room.member state PUT, which hungryserv
+		// rejects with 403 unless the user is already invited. Live webhook rooms
+		// are created without inviting the user, so the bot must invite first.
+		if err := ec.Bridge.Bot.EnsureInvited(ctx, p.MXID, userID); err != nil {
+			log.Debug().Err(err).Stringer("room", p.MXID).Msg("join-heal: EnsureInvited failed (continuing to join)")
 		}
 		if err := dp.EnsureJoined(ctx, p.MXID); err != nil {
 			failed++
