@@ -1,0 +1,33 @@
+pkg/graph/folders.go
+  s_b85fdc9b24e276::t_11fd8dc1cc438f 56
+  s_b85fdc9b24e276::t_9f1403ea7a6393 1-43,45-55,57-109
+  s_b85fdc9b24e276::t_b8c836a928f612 44
+pkg/connector/graph_delta.go
+  s_b85fdc9b24e276::t_e8ed6d578b143a 217-218
+  s_b85fdc9b24e276::t_58a479b33b2676 98-99
+pkg/connector/graph_removal.go
+  s_b85fdc9b24e276::t_8bdac048c1fae3 1-83,85-195
+  s_b85fdc9b24e276::t_17e93801d61807 84
+pkg/graph/folders_test.go
+  s_b85fdc9b24e276::t_b0ef62abd10074 1-90
+pkg/graph/message.go
+  s_b85fdc9b24e276::t_293deabbc042e2 88
+  s_b85fdc9b24e276::t_8be1a1ad9a5d23 20
+  s_b85fdc9b24e276::t_ddd19d9046c5b6 36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "04179c1b7d82d05ce6b48f59512fbb27609988c9",
+  "prompts": {},
+  "sessions": {
+    "s_b85fdc9b24e276": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f0c16e0-5afb-482a-a505-6a89b59fb574",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
