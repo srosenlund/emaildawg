@@ -16,19 +16,30 @@ const graphBaseURL = "https://graph.microsoft.com/v1.0"
 
 // Client is a Microsoft Graph API client scoped to a single mailbox.
 type Client struct {
-	tp     *TokenProvider
-	userID string
-	httpc  *http.Client
+	tp      *TokenProvider
+	userID  string
+	httpc   *http.Client
+	baseURL string // defaults to graphBaseURL; overridable in tests
 }
 
 // NewClient returns a Client that fetches tokens from tp and operates on the
 // mailbox identified by userID (the UPN, e.g. "mail@example.com").
 func NewClient(tp *TokenProvider, userID string) *Client {
 	return &Client{
-		tp:     tp,
-		userID: userID,
-		httpc:  &http.Client{Timeout: 30 * time.Second},
+		tp:      tp,
+		userID:  userID,
+		httpc:   &http.Client{Timeout: 30 * time.Second},
+		baseURL: graphBaseURL,
 	}
+}
+
+// base returns the API base URL, falling back to the package default when the
+// client was constructed without one (e.g. zero-value struct).
+func (c *Client) base() string {
+	if c.baseURL == "" {
+		return graphBaseURL
+	}
+	return c.baseURL
 }
 
 // GetMessage fetches a single message by Graph message ID from the client's
@@ -179,4 +190,72 @@ func (c *Client) FindGraphIDByInternetID(ctx context.Context, internetID string)
 		return "", nil
 	}
 	return result.Value[0].ID, nil
+}
+
+// MoveMessage moves a message to a folder identified by a well-known folder name
+// (e.g. "archive", "deleteditems") via POST /users/{id}/messages/{id}/move.
+// Follows the same token/header pattern as SetRead. Non-2xx → error with body.
+func (c *Client) MoveMessage(ctx context.Context, msgID, destWellKnownFolder string) error {
+	token, err := c.tp.Token(ctx)
+	if err != nil {
+		return fmt.Errorf("graph MoveMessage: acquire token: %w", err)
+	}
+
+	moveURL := fmt.Sprintf("%s/users/%s/messages/%s/move", c.base(), c.userID, url.PathEscape(msgID))
+	payload := []byte(`{"destinationId":"` + destWellKnownFolder + `"}`)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, moveURL, bytes.NewReader(payload))
+	if err != nil {
+		return fmt.Errorf("graph MoveMessage: build request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Add("Prefer", `IdType="ImmutableId"`)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpc.Do(req)
+	if err != nil {
+		return fmt.Errorf("graph MoveMessage: http: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("graph MoveMessage: read body: %w", err)
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("graph MoveMessage: status %d: %s", resp.StatusCode, body)
+	}
+	return nil
+}
+
+// DeleteMessage soft-deletes a message via DELETE /users/{id}/messages/{id},
+// which moves it to Deleted Items (recoverable). Non-2xx → error with body.
+func (c *Client) DeleteMessage(ctx context.Context, msgID string) error {
+	token, err := c.tp.Token(ctx)
+	if err != nil {
+		return fmt.Errorf("graph DeleteMessage: acquire token: %w", err)
+	}
+
+	delURL := fmt.Sprintf("%s/users/%s/messages/%s", c.base(), c.userID, url.PathEscape(msgID))
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, delURL, nil)
+	if err != nil {
+		return fmt.Errorf("graph DeleteMessage: build request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Add("Prefer", `IdType="ImmutableId"`)
+
+	resp, err := c.httpc.Do(req)
+	if err != nil {
+		return fmt.Errorf("graph DeleteMessage: http: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("graph DeleteMessage: read body: %w", err)
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("graph DeleteMessage: status %d: %s", resp.StatusCode, body)
+	}
+	return nil
 }
