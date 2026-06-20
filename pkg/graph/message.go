@@ -65,7 +65,7 @@ func parseGraphMessage(data []byte) (*GraphMessage, error) {
 	var received time.Time
 	if raw.ReceivedDateTime != "" {
 		var err error
-		received, err = time.Parse(time.RFC3339, raw.ReceivedDateTime)
+		received, err = time.Parse(time.RFC3339Nano, raw.ReceivedDateTime)
 		if err != nil {
 			return nil, fmt.Errorf("parse receivedDateTime %q: %w", raw.ReceivedDateTime, err)
 		}

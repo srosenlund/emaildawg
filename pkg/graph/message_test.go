@@ -2,6 +2,7 @@ package graph
 
 import (
 	"testing"
+	"time"
 )
 
 func TestParseGraphMessage(t *testing.T) {
@@ -45,5 +46,18 @@ func TestParseGraphMessage(t *testing.T) {
 	}
 	if m.ReceivedDateTime.Year() != 2018 || m.ReceivedDateTime.Month() != 9 || m.ReceivedDateTime.Day() != 9 {
 		t.Fatalf("want ReceivedDateTime=2018-09-09 got %v", m.ReceivedDateTime)
+	}
+}
+
+func TestParseGraphMessageFractionalSeconds(t *testing.T) {
+	// Test that fractional-second timestamps (as returned by Microsoft Graph) parse correctly
+	raw := []byte(`{"id":"AAM=","receivedDateTime":"2018-09-09T03:15:08.0000000Z","internetMessageId":"<x@y>","subject":"concert","conversationId":"AAQ=","isRead":true,"hasAttachments":false,"body":{"contentType":"text","content":"hi"},"from":{"emailAddress":{"name":"Adele","address":"adelev@contoso.com"}},"toRecipients":[{"emailAddress":{"name":"Alex","address":"alexw@contoso.com"}}]}`)
+	m, err := parseGraphMessage(raw)
+	if err != nil {
+		t.Fatalf("parseGraphMessage with fractional seconds failed: %v", err)
+	}
+	expected := time.Date(2018, 9, 9, 3, 15, 8, 0, time.UTC)
+	if !m.ReceivedDateTime.Equal(expected) {
+		t.Fatalf("want ReceivedDateTime=%v got %v", expected, m.ReceivedDateTime)
 	}
 }
