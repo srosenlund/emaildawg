@@ -41,15 +41,21 @@
 
 ## Task 2: Flow 3 — read in Beeper → Outlook
 
+> **Critical id distinction:** our bridgev2 message dedup id is `"email:<internetMessageID>"` (RFC822 Message-ID). But Graph `PATCH /messages/{id}` needs Graph's INTERNAL message id (a base64url resource id), which is a DIFFERENT value. So we must resolve internetMessageID → Graph id before PATCHing. And the **suppression key is `internetMessageID`** (the one stable value available on BOTH the PATCH side here and the webhook side in Task 3 — the webhook's `resourceData.id` is a Graph id we'll convert back to internetMessageID via GetMessage).
+
 **Files:**
+- Modify: `pkg/graph/client.go` (add internetMessageID→Graph-id resolver)
 - Create: `pkg/connector/graph_readreceipt.go`
-- Modify: `pkg/connector/connector.go` (ensure `*EmailClient` satisfies `ReadReceiptHandlingNetworkAPI`)
+- Modify: `pkg/connector/connector.go` (compile-time assertion `*EmailClient` satisfies `ReadReceiptHandlingNetworkAPI`)
 
 **Interfaces:**
 - Consumes: `Client.SetRead` (Task 1), `suppress` (Task 1), `ec.Bridge.DB.Message`.
-- Produces: `func (ec *EmailClient) HandleMatrixReadReceipt(ctx context.Context, rcpt *bridgev2.MatrixReadReceipt) error` — resolve the Graph message id, suppress it, then `SetRead(id, true)`.
+- Produces:
+  - `func (c *graph.Client) FindGraphIDByInternetID(ctx, internetID string) (string, error)` — `GET /users/{userID}/messages?$filter=internetMessageId eq '<internetID>'&$select=id&$top=1` (URL-encode the whole query; OData single-quotes in the value doubled if any). Returns `value[0].id` (Graph internal id) or "" if not found. Sends `Prefer: IdType="ImmutableId"` so the returned id is the immutable form (survives moves — needed for Phase 3).
+  - `func (ec *EmailClient) HandleMatrixReadReceipt(ctx context.Context, rcpt *bridgev2.MatrixReadReceipt) error`.
 
-- [ ] **Step 1:** Implement `HandleMatrixReadReceipt`:
+- [ ] **Step 1:** Implement `FindGraphIDByInternetID` in client.go (filter query, return id).
+- [ ] **Step 2:** Implement `HandleMatrixReadReceipt`:
 ```go
 func (ec *EmailClient) HandleMatrixReadReceipt(ctx context.Context, rcpt *bridgev2.MatrixReadReceipt) error {
     msg := rcpt.ExactMessage
@@ -58,20 +64,21 @@ func (ec *EmailClient) HandleMatrixReadReceipt(ctx context.Context, rcpt *bridge
         msg, err = ec.Main.Bridge.DB.Message.GetPartByMXID(ctx, rcpt.EventID)
         if err != nil || msg == nil { return nil } // not a bridged message; ignore
     }
-    remoteID := string(msg.ID) // "email:<internetMessageID>"
-    graphID := strings.TrimPrefix(remoteID, "email:")
-    if graphID == remoteID { return nil } // unexpected format; skip
-    ec.Main.suppress.Suppress(graphID)     // prevent the resulting `updated` webhook from echoing back
+    internetID := strings.TrimPrefix(string(msg.ID), "email:")
+    if internetID == string(msg.ID) { return nil } // unexpected format; skip
+    ec.Main.suppress.Suppress(internetID)          // suppression key = internetMessageID (consistent with Task 3)
+    graphID, err := ec.Main.graphClient.FindGraphIDByInternetID(ctx, internetID)
+    if err != nil || graphID == "" { ec.Main.suppress.Forget(internetID); return err }
     if err := ec.Main.graphClient.SetRead(ctx, graphID, true); err != nil {
-        ec.Main.suppress.Forget(graphID)   // PATCH failed → allow webhook to handle it
+        ec.Main.suppress.Forget(internetID)        // PATCH failed → let webhook handle it
         return err
     }
     return nil
 }
 ```
-   (Verify field access against the real EmailClient — `ec.Main` is the `*EmailConnector` per Phase 1 LoadUserLogin; confirm `graphClient`/`suppress` are reachable. Add a `Forget(id)` method to suppressCache in Task 1 if you prefer, or inline-delete. The suppress key must be the SAME graphID form used by the webhook side in Task 3.)
-- [ ] **Step 2:** Confirm `*EmailClient` now implements `bridgev2.ReadReceiptHandlingNetworkAPI` — add a compile-time assertion `var _ bridgev2.ReadReceiptHandlingNetworkAPI = (*EmailClient)(nil)` near the EmailClient type. Build will fail if the signature is wrong.
-- [ ] **Step 3:** Build + vet (the interface assertion is the verification — bridgev2 calls this handler automatically when a Matrix read receipt arrives). Commit (`feat:`).
+   (Verify `ec.Main` is the `*EmailConnector` and `graphClient`/`suppress` are reachable, per Phase 1 LoadUserLogin. `Forget` exists from Task 1.)
+- [ ] **Step 3:** Add `var _ bridgev2.ReadReceiptHandlingNetworkAPI = (*EmailClient)(nil)` near the EmailClient type. Build fails if the signature is wrong.
+- [ ] **Step 4:** Build + vet. Commit (`feat:`).
 
 ---
 
@@ -86,8 +93,8 @@ func (ec *EmailClient) HandleMatrixReadReceipt(ctx context.Context, rcpt *bridge
 
 - [ ] **Step 1:** In the webhook background worker (`processWebhookItem`), branch on `changeType`:
   - `created` → existing deliver path (unchanged).
-  - `updated` → fetch via `GetMessage`; if `ec.suppress.IsSuppressed(msgID)` return (this is the echo of our own PATCH — drop it); else if `msg.IsRead`, call `ec.deliverReadReceipt(login, msg)`.
-  (`webhookItem` already carries `changeType` from Phase 1 Task 3 fix.)
+  - `updated` → fetch via `GetMessage(graphID)` (graphID = webhook `resourceData.id`); then check suppression on the message's `InternetMessageID` (NOT the Graph id): `if ec.suppress.IsSuppressed(g.InternetMessageID) { return }` (this is the echo of our own PATCH — drop it); else if `g.IsRead`, call `client.deliverReadReceipt(ctx, g)`.
+  (`webhookItem` already carries `changeType` from Phase 1 Task 3 fix. The suppression key is `InternetMessageID` on both sides — Task 2 suppresses it before PATCHing, here we check it after resolving the Graph id back to InternetMessageID via GetMessage.)
 - [ ] **Step 2:** Implement `deliverReadReceipt` on `*EmailClient` (graph_deliver.go):
 ```go
 func (ec *EmailClient) deliverReadReceipt(ctx context.Context, g *graph.GraphMessage) {
