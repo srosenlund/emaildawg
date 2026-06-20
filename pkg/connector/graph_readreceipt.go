@@ -38,13 +38,23 @@ func (ec *EmailClient) HandleMatrixReadReceipt(ctx context.Context, rcpt *bridge
 		return nil
 	}
 
+	// IMAP mode: no Graph client configured, nothing to mark as read.
+	if ec.Main.graphClient == nil {
+		return nil
+	}
+
 	// Record suppression before the PATCH so we don't race the webhook.
 	ec.Main.suppress.Suppress(internetID)
 
 	graphID, err := ec.Main.graphClient.FindGraphIDByInternetID(ctx, internetID)
-	if err != nil || graphID == "" {
+	if err != nil {
 		ec.Main.suppress.Forget(internetID)
 		return err
+	}
+	if graphID == "" {
+		ec.Main.suppress.Forget(internetID)
+		ec.UserLogin.Log.Warn().Str("internet_message_id", internetID).Msg("read receipt for unknown Graph message, ignoring")
+		return nil
 	}
 
 	if err := ec.Main.graphClient.SetRead(ctx, graphID, true); err != nil {

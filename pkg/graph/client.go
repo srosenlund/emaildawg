@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -135,8 +136,9 @@ func (c *Client) FindGraphIDByInternetID(ctx context.Context, internetID string)
 		return "", fmt.Errorf("graph FindGraphIDByInternetID: acquire token: %w", err)
 	}
 
+	escaped := strings.ReplaceAll(internetID, "'", "''")
 	q := url.Values{}
-	q.Set("$filter", "internetMessageId eq '"+internetID+"'")
+	q.Set("$filter", "internetMessageId eq '"+escaped+"'")
 	q.Set("$select", "id")
 	q.Set("$top", "1")
 	filterURL := fmt.Sprintf("%s/users/%s/messages?%s", graphBaseURL, c.userID, q.Encode())
