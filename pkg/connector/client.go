@@ -256,6 +256,21 @@ func (ec *EmailConnector) LoadUserLogin(ctx context.Context, login *bridgev2.Use
 }
 
 func (ec *EmailClient) Connect(ctx context.Context) {
+	// Graph mode: mail is delivered exclusively via Microsoft Graph webhooks
+	// (subscription wired up in EmailConnector.Start → ensureGraphSubscription).
+	// There is no IMAP client and no IDLE loop, so the IMAP-based auth_failure
+	// path below would falsely report BRIDGE_UNREACHABLE (E-EMAIL-001). Instead,
+	// drive the coordinator to CONNECTED: connection_established marks the inbox
+	// connected, idle_started marks it ready. The Graph subscription/webhook is
+	// the source of truth for delivery and is independently health-checked.
+	if ec.Main != nil && ec.Main.Config.Graph.Enabled {
+		ec.isConnected.Store(true)
+		ec.stateCoordinator.ReportSimpleEvent("inbox", string(coordinator.EventConnectionEstablished), true, "", nil)
+		ec.stateCoordinator.ReportSimpleEvent("inbox", string(coordinator.EventIdleStarted), true, "", nil)
+		ec.UserLogin.Log.Info().Msg("Connect: graph mode — reporting CONNECTED (Graph webhook delivery active)")
+		return
+	}
+
 	if ec.IMAPClient == nil {
 		ec.stateCoordinator.ReportSimpleEvent("inbox", "auth_failure", false, EmailNotLoggedIn, nil)
 		return
