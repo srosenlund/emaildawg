@@ -345,6 +345,10 @@ func (ec *EmailConnector) Start(ctx context.Context) error {
 	// One-shot stuck-message recovery (EMAILDAWG_FORCE_REDELIVER). No-op unless set.
 	go ec.forceRedeliver(ctx)
 
+	// Periodic self-heal: re-deliver orphaned messages whose Matrix event is
+	// missing (disable with EMAILDAWG_SELFHEAL=off).
+	go ec.selfHealLoop(ctx)
+
 	return nil
 }
 

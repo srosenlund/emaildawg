@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -258,4 +259,59 @@ func (c *Client) DeleteMessage(ctx context.Context, msgID string) error {
 		return fmt.Errorf("graph DeleteMessage: status %d: %s", resp.StatusCode, body)
 	}
 	return nil
+}
+
+// InboxRef is a lightweight reference to an inbox message (immutable Graph id +
+// RFC-822 internetMessageId), used by the self-heal audit.
+type InboxRef struct {
+	GraphID           string
+	InternetMessageID string
+}
+
+// ListRecentInbox returns the most recent inbox messages (newest first) with only
+// their immutable id and internetMessageId, for orphan auditing.
+func (c *Client) ListRecentInbox(ctx context.Context, top int) ([]InboxRef, error) {
+	token, err := c.tp.Token(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("graph ListRecentInbox: acquire token: %w", err)
+	}
+	q := url.Values{}
+	q.Set("$top", strconv.Itoa(top))
+	q.Set("$orderby", "receivedDateTime desc")
+	q.Set("$select", "id,internetMessageId")
+	listURL := fmt.Sprintf("%s/users/%s/mailFolders/inbox/messages?%s", c.base(), c.userID, q.Encode())
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, listURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("graph ListRecentInbox: build request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Add("Prefer", `IdType="ImmutableId"`)
+
+	resp, err := c.httpc.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("graph ListRecentInbox: http: %w", err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("graph ListRecentInbox: read body: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("graph ListRecentInbox: status %d: %s", resp.StatusCode, body)
+	}
+	var result struct {
+		Value []struct {
+			ID                string `json:"id"`
+			InternetMessageID string `json:"internetMessageId"`
+		} `json:"value"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("graph ListRecentInbox: parse: %w", err)
+	}
+	refs := make([]InboxRef, 0, len(result.Value))
+	for _, v := range result.Value {
+		refs = append(refs, InboxRef{GraphID: v.ID, InternetMessageID: v.InternetMessageID})
+	}
+	return refs, nil
 }
