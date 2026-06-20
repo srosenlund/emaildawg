@@ -3,9 +3,11 @@ package graph
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -40,8 +42,8 @@ func (c *Client) GetMessage(ctx context.Context, id string) (*GraphMessage, erro
 		return nil, fmt.Errorf("graph GetMessage: acquire token: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/users/%s/messages/%s", graphBaseURL, c.userID, id)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	msgURL := fmt.Sprintf("%s/users/%s/messages/%s", graphBaseURL, c.userID, url.PathEscape(id))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, msgURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("graph GetMessage: build request: %w", err)
 	}
@@ -81,7 +83,7 @@ func (c *Client) SetRead(ctx context.Context, msgID string, isRead bool) error {
 		return fmt.Errorf("graph SetRead: acquire token: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/users/%s/messages/%s", graphBaseURL, c.userID, msgID)
+	patchURL := fmt.Sprintf("%s/users/%s/messages/%s", graphBaseURL, c.userID, url.PathEscape(msgID))
 
 	isReadStr := "false"
 	if isRead {
@@ -89,7 +91,7 @@ func (c *Client) SetRead(ctx context.Context, msgID string, isRead bool) error {
 	}
 	payload := []byte(`{"isRead":` + isReadStr + `}`)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, url, bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, patchURL, bytes.NewReader(payload))
 	if err != nil {
 		return fmt.Errorf("graph SetRead: build request: %w", err)
 	}
@@ -114,4 +116,65 @@ func (c *Client) SetRead(ctx context.Context, msgID string, isRead bool) error {
 	}
 
 	return nil
+}
+
+// FindGraphIDByInternetID resolves an RFC-822 internetMessageId to the Graph
+// internal (immutable) message id. It issues:
+//
+//	GET /users/{userID}/messages?$filter=internetMessageId eq '<internetID>'&$select=id&$top=1
+//
+// The whole OData query string is URL-encoded via url.Values so that special
+// characters in the filter value are safely escaped. The Prefer: IdType="ImmutableId"
+// header is sent so the returned id is the immutable form (survives folder moves).
+//
+// Returns ("", nil) when no match is found and (id, nil) on success.
+// Returns ("", err) on HTTP or JSON parse failure.
+func (c *Client) FindGraphIDByInternetID(ctx context.Context, internetID string) (string, error) {
+	token, err := c.tp.Token(ctx)
+	if err != nil {
+		return "", fmt.Errorf("graph FindGraphIDByInternetID: acquire token: %w", err)
+	}
+
+	q := url.Values{}
+	q.Set("$filter", "internetMessageId eq '"+internetID+"'")
+	q.Set("$select", "id")
+	q.Set("$top", "1")
+	filterURL := fmt.Sprintf("%s/users/%s/messages?%s", graphBaseURL, c.userID, q.Encode())
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, filterURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("graph FindGraphIDByInternetID: build request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Add("Prefer", `IdType="ImmutableId"`)
+
+	resp, err := c.httpc.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("graph FindGraphIDByInternetID: http: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("graph FindGraphIDByInternetID: read body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("graph FindGraphIDByInternetID: status %d: %s", resp.StatusCode, body)
+	}
+
+	var result struct {
+		Value []struct {
+			ID string `json:"id"`
+		} `json:"value"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", fmt.Errorf("graph FindGraphIDByInternetID: parse response: %w", err)
+	}
+
+	if len(result.Value) == 0 {
+		return "", nil
+	}
+	return result.Value[0].ID, nil
 }

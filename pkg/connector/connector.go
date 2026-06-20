@@ -55,8 +55,9 @@ type EmailConnector struct {
 }
 
 var (
-	_ bridgev2.NetworkConnector = (*EmailConnector)(nil)
-	_ bridgev2.StoppableNetwork = (*EmailConnector)(nil)
+	_ bridgev2.NetworkConnector              = (*EmailConnector)(nil)
+	_ bridgev2.StoppableNetwork              = (*EmailConnector)(nil)
+	_ bridgev2.ReadReceiptHandlingNetworkAPI = (*EmailClient)(nil)
 )
 
 func (ec *EmailConnector) GetName() bridgev2.BridgeName {
