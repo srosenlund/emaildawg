@@ -352,6 +352,10 @@ func (ec *EmailConnector) Start(ctx context.Context) error {
 	// One-shot clean inbox rebuild (EMAILDAWG_REBUILD_INBOX=1). No-op unless set.
 	go ec.forceRebuildInbox(ctx)
 
+	// Periodically ensure the user is joined to all email rooms — live webhook
+	// rooms aren't reliably auto-joined on Beeper (disable with EMAILDAWG_JOINHEAL=off).
+	go ec.ensureJoinedLoop(ctx)
+
 	return nil
 }
 
