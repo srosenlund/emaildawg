@@ -95,6 +95,8 @@ func (ec *EmailConnector) runBackfill(ctx context.Context) {
 				client.deliverReadReceipt(ctx, msg)
 			}
 		}
+		// Reflect messages that left the inbox (archive → Flow 5, delete → Flow 7).
+		ec.handleRemovals(ctx, client, removed)
 		total += len(msgs)
 
 		if deltaLink != "" {
@@ -212,6 +214,8 @@ func (ec *EmailConnector) reconcile(ctx context.Context) {
 				client.deliverReadReceipt(ctx, msg)
 			}
 		}
+		// Reflect messages that left the inbox (archive → Flow 5, delete → Flow 7).
+		ec.handleRemovals(ctx, client, removed)
 		total += len(msgs)
 
 		if deltaLink != "" {

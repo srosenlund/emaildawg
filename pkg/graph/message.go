@@ -17,6 +17,7 @@ type GraphMessage struct {
 	ID                 string
 	InternetMessageID  string
 	ConversationID     string
+	ParentFolderID     string
 	Subject            string
 	FromName           string
 	FromAddress        string
@@ -32,6 +33,7 @@ type graphMessageJSON struct {
 	ID                 string `json:"id"`
 	InternetMessageID  string `json:"internetMessageId"`
 	ConversationID     string `json:"conversationId"`
+	ParentFolderID     string `json:"parentFolderId"`
 	Subject            string `json:"subject"`
 	IsRead             bool   `json:"isRead"`
 	HasAttachments     bool   `json:"hasAttachments"`
@@ -83,6 +85,7 @@ func parseGraphMessage(data []byte) (*GraphMessage, error) {
 		ID:               raw.ID,
 		InternetMessageID: raw.InternetMessageID,
 		ConversationID:   raw.ConversationID,
+		ParentFolderID:   raw.ParentFolderID,
 		Subject:          raw.Subject,
 		FromName:         raw.From.EmailAddress.Name,
 		FromAddress:      raw.From.EmailAddress.Address,
