@@ -1,0 +1,27 @@
+pkg/graph/client_reply_test.go
+  s_b85fdc9b24e276::t_9596fa8423d7ce 5,15,24-25,29-30,51-54,56-57,64-103
+pkg/connector/client.go
+  s_b85fdc9b24e276::t_70f5a24deca491 641-657,661
+  s_b85fdc9b24e276::t_24802e8c7ace54 590-591,598-606
+  s_b85fdc9b24e276::t_0dd9405d859491 18
+pkg/graph/client.go
+  s_b85fdc9b24e276::t_561919d381b08f 6
+  s_b85fdc9b24e276::t_d901600cb9ecaa 325-343,368-370,372,386-400
+  s_b85fdc9b24e276::t_02e04ad2253400 80-84
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "51987162ba6f15c8c6919778c40a081675338699",
+  "prompts": {},
+  "sessions": {
+    "s_b85fdc9b24e276": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f0c16e0-5afb-482a-a505-6a89b59fb574",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
