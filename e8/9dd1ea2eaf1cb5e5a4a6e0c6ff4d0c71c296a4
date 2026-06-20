@@ -1,0 +1,20 @@
+pkg/connector/connector.go
+  s_b85fdc9b24e276::t_3c520653ad468a 591-600,608-611
+  s_b85fdc9b24e276::t_1caa0860f28cc0 23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "e89dd1ea2eaf1cb5e5a4a6e0c6ff4d0c71c296a4",
+  "prompts": {},
+  "sessions": {
+    "s_b85fdc9b24e276": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f0c16e0-5afb-482a-a505-6a89b59fb574",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
