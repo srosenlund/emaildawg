@@ -1,0 +1,19 @@
+pkg/connector/graph_joinheal.go
+  s_b85fdc9b24e276::t_6459fd83329064 55,66-70
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "61b6245470fc25e41d9f182d45827792c1448b68",
+  "prompts": {},
+  "sessions": {
+    "s_b85fdc9b24e276": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f0c16e0-5afb-482a-a505-6a89b59fb574",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
