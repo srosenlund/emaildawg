@@ -132,7 +132,5 @@ func (ec *EmailConnector) runSelfHeal(ctx context.Context) {
 		log.Info().Str("imi", ref.InternetMessageID).Bool("fake_mxid", isFake).
 			Str("subject", g.Subject).Msg("self-heal: re-delivered orphaned message")
 	}
-	if healed > 0 {
-		log.Info().Int("healed", healed).Int("scanned", len(refs)).Msg("self-heal: pass complete")
-	}
+	log.Info().Int("healed", healed).Int("scanned", len(refs)).Msg("self-heal: pass complete")
 }
