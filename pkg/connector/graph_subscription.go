@@ -78,7 +78,9 @@ func (ec *EmailConnector) ensureGraphSubscription(ctx context.Context) {
 
 	if gs != nil && gs.SubscriptionID != "" && time.Until(gs.SubscriptionExpiry) > subscriptionRenewalThreshold {
 		// Reuse the existing subscription — it is valid and has >24h left.
+		ec.graphMu.Lock()
 		ec.graphClientState = gs.ClientState
+		ec.graphMu.Unlock()
 		ec.Bridge.Log.Info().
 			Str("subscription_id", gs.SubscriptionID).
 			Time("expiry", gs.SubscriptionExpiry).
@@ -100,7 +102,9 @@ func (ec *EmailConnector) ensureGraphSubscription(ctx context.Context) {
 		return
 	}
 
+	ec.graphMu.Lock()
 	ec.graphClientState = clientState
+	ec.graphMu.Unlock()
 
 	newGS := &GraphState{
 		UserMXID:           ownerMXID,
@@ -116,7 +120,9 @@ func (ec *EmailConnector) ensureGraphSubscription(ctx context.Context) {
 		}(),
 	}
 	if err := ec.DB.UpsertGraphState(ctx, newGS); err != nil {
-		ec.Bridge.Log.Error().Err(err).Msg("Graph subscription: failed to persist GraphState")
+		ec.Bridge.Log.Warn().Err(err).
+			Str("subscription_id", sub.ID).
+			Msg("Graph subscription: subscription is LIVE but failed to persist GraphState — a restart may recreate a duplicate subscription")
 	}
 
 	ec.Bridge.Log.Info().
@@ -125,6 +131,28 @@ func (ec *EmailConnector) ensureGraphSubscription(ctx context.Context) {
 		Msg("Graph subscription: created new subscription")
 
 	go ec.runSubscriptionRenewal(ctx, ownerMXID, email, sub.ID, sub.ExpirationDateTime)
+}
+
+// persistRenewedExpiry loads the current GraphState from DB, updates
+// SubscriptionExpiry to newExp, and upserts it. It reads ownerMXID and email
+// from ec.Config so it can be called from any goroutine without extra args.
+// Errors are logged at Warn level — they do not block the subscription being live.
+func (ec *EmailConnector) persistRenewedExpiry(ctx context.Context, newExp time.Time) {
+	ownerMXID := ec.Config.OAuth2.OwnerMXID
+	email := ec.Config.OAuth2.AutoLoginEmail
+	gs, dbErr := ec.DB.GetGraphState(ctx, ownerMXID, email)
+	if dbErr != nil {
+		ec.Bridge.Log.Warn().Err(dbErr).Msg("Graph subscription: failed to load GraphState for expiry persist")
+		return
+	}
+	if gs == nil {
+		ec.Bridge.Log.Warn().Msg("Graph subscription: no GraphState found to persist renewed expiry")
+		return
+	}
+	gs.SubscriptionExpiry = newExp
+	if upsertErr := ec.DB.UpsertGraphState(ctx, gs); upsertErr != nil {
+		ec.Bridge.Log.Warn().Err(upsertErr).Msg("Graph subscription: failed to persist renewed expiry")
+	}
 }
 
 // runSubscriptionRenewal ticks every hour and PATCHes the subscription expiry
@@ -152,14 +180,8 @@ func (ec *EmailConnector) runSubscriptionRenewal(ctx context.Context, ownerMXID,
 			}
 			expiry = newExp
 
-			// Persist updated expiry.
-			gs, dbErr := ec.DB.GetGraphState(ctx, ownerMXID, email)
-			if dbErr == nil && gs != nil {
-				gs.SubscriptionExpiry = expiry
-				if upsertErr := ec.DB.UpsertGraphState(ctx, gs); upsertErr != nil {
-					ec.Bridge.Log.Warn().Err(upsertErr).Msg("Graph subscription: failed to persist renewed expiry")
-				}
-			}
+			// Persist updated expiry via shared helper.
+			ec.persistRenewedExpiry(ctx, newExp)
 
 			ec.Bridge.Log.Info().
 				Str("subscription_id", subID).
@@ -181,7 +203,7 @@ type lifecyclePayload struct {
 }
 
 // handleLifecycleEvents inspects an already-read webhook body for lifecycle
-// events. It is called from handleGraphWebhook when the body contains a
+// events. It is called from handleGraphWebhookFull when the body contains a
 // "lifecycleEvent" field. Returns true if the body was a lifecycle payload
 // (caller should not treat it as a change notification).
 func (ec *EmailConnector) handleLifecycleEvents(ctx context.Context, body []byte) bool {
@@ -215,7 +237,7 @@ func (ec *EmailConnector) handleLifecycleEvents(ctx context.Context, body []byte
 	}
 
 	for _, item := range items {
-		if item.ClientState != ec.graphClientState {
+		if item.ClientState != ec.expectedClientState() {
 			ec.Bridge.Log.Warn().
 				Str("lifecycle_event", item.LifecycleEvent).
 				Str("subscription_id", item.SubscriptionID).
@@ -238,6 +260,7 @@ func (ec *EmailConnector) handleLifecycleEvents(ctx context.Context, body []byte
 						Msg("Graph lifecycle: renewal after reauthorizationRequired failed")
 					return
 				}
+				ec.persistRenewedExpiry(ctx, newExp)
 				ec.Bridge.Log.Info().Str("subscription_id", subID).Msg("Graph lifecycle: reauthorization renewal succeeded")
 			}(item.SubscriptionID)
 
@@ -266,14 +289,10 @@ func (ec *EmailConnector) handleLifecycleEvents(ctx context.Context, body []byte
 	return true
 }
 
-// handleGraphWebhookWithLifecycle is the updated version of the webhook handler
-// that also dispatches lifecycle events. It replaces the inline handler registered
-// in Start(). The caller (Start) must use this method instead of handleGraphWebhook.
-//
-// NOTE: This is wired via Start() in connector.go; this file adds the lifecycle
-// dispatch. The function is intentionally separate so connector.go does not need
-// to be rewritten — we override the route registration in Start() by calling
-// ensureGraphSubscription after route registration.
+// handleGraphWebhookFull is the unified webhook+lifecycle handler registered on
+// POST /_email/graph/webhook. It handles both the subscription-validation
+// handshake, lifecycle events (reauthorizationRequired, subscriptionRemoved,
+// missed), and normal change notifications.
 func (ec *EmailConnector) handleGraphWebhookFull(w http.ResponseWriter, r *http.Request) {
 	// Validation handshake: Graph sends ?validationToken= when creating/renewing.
 	if graph.ValidationResponse(w, r) {
@@ -303,8 +322,9 @@ func (ec *EmailConnector) handleGraphWebhookFull(w http.ResponseWriter, r *http.
 		return
 	}
 
+	cs := ec.expectedClientState()
 	for _, item := range n.Value {
-		if item.ClientState != ec.graphClientState {
+		if item.ClientState != cs {
 			ec.Bridge.Log.Warn().
 				Str("got", item.ClientState).
 				Msg("Graph webhook: clientState mismatch — ignoring item")

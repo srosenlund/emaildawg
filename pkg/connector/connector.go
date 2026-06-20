@@ -3,11 +3,10 @@ package connector
 import (
 	"context"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/iFixRobots/emaildawg/pkg/common"
@@ -24,7 +23,7 @@ import (
 	"maunium.net/go/mautrix/id"
 )
 
-// webhookItem is enqueued by handleGraphWebhook for background processing.
+// webhookItem is enqueued by handleGraphWebhookFull for background processing.
 type webhookItem struct {
 	messageID  string
 	changeType string // e.g. "created", "updated", "deleted" — carried for Task 4
@@ -45,7 +44,8 @@ type EmailConnector struct {
 
 	// Graph webhook fields — populated in Start() when a public_address is configured.
 	graphClient      *graph.Client
-	graphClientState string // expected clientState for signature validation
+	graphMu          sync.RWMutex // guards graphClientState
+	graphClientState string       // expected clientState for signature validation; access via expectedClientState()
 	webhookQueue     chan webhookItem
 }
 
@@ -304,7 +304,9 @@ func (ec *EmailConnector) Start(ctx context.Context) error {
 	// generated clientState persisted in the graph_state table. Initialise to
 	// an empty sentinel here — the webhook handler will discard anything that
 	// does not match the value set by ensureGraphSubscription.
+	ec.graphMu.Lock()
 	ec.graphClientState = ""
+	ec.graphMu.Unlock()
 
 	// Buffered channel to decouple the HTTP handler (must respond in 3s) from
 	// the blocking GetMessage + deliver work.
@@ -322,56 +324,6 @@ func (ec *EmailConnector) Start(ctx context.Context) error {
 	ec.ensureGraphSubscription(ctx)
 
 	return nil
-}
-
-// handleGraphWebhook handles Microsoft Graph change-notification POSTs.
-// It first checks for the subscription-validation handshake. If not a
-// validation request, it parses the notification payload, validates the
-// clientState, enqueues message IDs, and responds 202 within the 3s window.
-func (ec *EmailConnector) handleGraphWebhook(w http.ResponseWriter, r *http.Request) {
-	// Validation handshake: Graph sends ?validationToken= when creating/renewing
-	// a subscription. Must respond within 10s.
-	if graph.ValidationResponse(w, r) {
-		return
-	}
-
-	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20)) // 1 MiB cap
-	if err != nil {
-		ec.Bridge.Log.Error().Err(err).Msg("Graph webhook: failed to read body")
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	n, err := graph.ParseNotifications(body)
-	if err != nil {
-		ec.Bridge.Log.Error().Err(err).Msg("Graph webhook: failed to parse notifications")
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	for _, item := range n.Value {
-		if item.ClientState != ec.graphClientState {
-			ec.Bridge.Log.Warn().
-				Str("got", item.ClientState).
-				Msg("Graph webhook: clientState mismatch — ignoring item")
-			continue
-		}
-		if item.ChangeType != "created" {
-			// Only process created messages in the current implementation.
-			continue
-		}
-		msgID := item.ResourceData.ID
-		if msgID == "" {
-			continue
-		}
-		select {
-		case ec.webhookQueue <- webhookItem{messageID: msgID, changeType: item.ChangeType}:
-		default:
-			ec.Bridge.Log.Warn().Str("message_id", msgID).Msg("Graph webhook: queue full, dropping message")
-		}
-	}
-
-	w.WriteHeader(http.StatusAccepted)
 }
 
 // runWebhookWorker drains the webhook queue and delivers each message.
@@ -506,6 +458,13 @@ func (ec *EmailConnector) Stop() {
 }
 
 // LoadUserLogin is now implemented in client.go
+
+// expectedClientState returns the current graphClientState value safely under a read lock.
+func (ec *EmailConnector) expectedClientState() string {
+	ec.graphMu.RLock()
+	defer ec.graphMu.RUnlock()
+	return ec.graphClientState
+}
 
 func (ec *EmailConnector) GetCapabilities() *bridgev2.NetworkGeneralCapabilities {
 	return &bridgev2.NetworkGeneralCapabilities{
