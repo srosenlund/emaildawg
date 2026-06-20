@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"maunium.net/go/mautrix/bridgev2"
 )
 
 const (
@@ -58,17 +60,29 @@ func (ec *EmailConnector) ensureAllPortalsJoined(ctx context.Context) {
 		log.Warn().Err(err).Msg("join-heal: failed to list portals")
 		return
 	}
-	joined, failed := 0, 0
+	// Two-phase to avoid a race: hungryserv rejects the double puppet's join
+	// (m.room.member membership=join state PUT) with 403 unless the user is
+	// already invited, and an invite issued in the same iteration may not have
+	// propagated before the join. So invite ALL rooms first, let invites settle,
+	// then join ALL rooms. Live webhook rooms are created without inviting the
+	// user, which is why this is needed at all.
+	withMXID := make([]*bridgev2.Portal, 0, len(portals))
 	for _, p := range portals {
 		if p.MXID == "" {
 			continue
 		}
-		// The double puppet joins via an m.room.member state PUT, which hungryserv
-		// rejects with 403 unless the user is already invited. Live webhook rooms
-		// are created without inviting the user, so the bot must invite first.
+		withMXID = append(withMXID, p)
 		if err := ec.Bridge.Bot.EnsureInvited(ctx, p.MXID, userID); err != nil {
-			log.Debug().Err(err).Stringer("room", p.MXID).Msg("join-heal: EnsureInvited failed (continuing to join)")
+			log.Debug().Err(err).Stringer("room", p.MXID).Msg("join-heal: EnsureInvited failed")
 		}
+	}
+	select {
+	case <-ctx.Done():
+		return
+	case <-time.After(2 * time.Second):
+	}
+	joined, failed := 0, 0
+	for _, p := range withMXID {
 		if err := dp.EnsureJoined(ctx, p.MXID); err != nil {
 			failed++
 			continue
