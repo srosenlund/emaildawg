@@ -325,7 +325,11 @@ func (ec *EmailConnector) handleGraphWebhookFull(w http.ResponseWriter, r *http.
 	w.WriteHeader(http.StatusAccepted)
 
 	// Dispatch lifecycle events (reauthorizationRequired, subscriptionRemoved, missed).
-	if ec.handleLifecycleEvents(r.Context(), body) {
+	// Use the bridge's long-lived BackgroundCtx, not r.Context(): r.Context() is
+	// cancelled the instant the HTTP handler returns (we already sent 202 above),
+	// which would cause every Graph call inside the lifecycle goroutines to fail
+	// with "context canceled".
+	if ec.handleLifecycleEvents(ec.Bridge.BackgroundCtx, body) {
 		return
 	}
 

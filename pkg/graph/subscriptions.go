@@ -57,6 +57,7 @@ func buildSubscriptionBody(userID, notifyURL, clientState string, exp time.Time)
 	}
 
 	payload := subscriptionRequestBody{
+		// "updated" is pre-provisioned for Phase 2 read-state sync; Phase 1 only acts on "created".
 		ChangeType:               "created,updated",
 		NotificationURL:          notifyURL,
 		LifecycleNotificationURL: notifyURL,
