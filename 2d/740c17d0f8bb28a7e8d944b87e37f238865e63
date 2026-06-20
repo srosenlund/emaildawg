@@ -1,0 +1,21 @@
+pkg/connector/connector.go
+  s_2684881a741748::t_0a47d7aedd4ffd 360-363
+pkg/connector/graph_delta.go
+  s_2684881a741748::t_38aa5a71a3fc62 7-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "2d740c17d0f8bb28a7e8d944b87e37f238865e63",
+  "prompts": {},
+  "sessions": {
+    "s_2684881a741748": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7ca44acd-05a2-4083-b4c4-139c4c329cc4",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
