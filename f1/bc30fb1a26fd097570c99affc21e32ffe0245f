@@ -1,0 +1,22 @@
+pkg/connector/graph_httpserver.go
+  s_b85fdc9b24e276::t_5e7ef64e2130f8 7
+  s_b85fdc9b24e276::t_a41acc88d884ea 25-26,45-53,57-58,64,66,70-71
+pkg/connector/connector.go
+  s_b85fdc9b24e276::t_51829bacb634c7 325-328
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "f1bc30fb1a26fd097570c99affc21e32ffe0245f",
+  "prompts": {},
+  "sessions": {
+    "s_b85fdc9b24e276": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f0c16e0-5afb-482a-a505-6a89b59fb574",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
