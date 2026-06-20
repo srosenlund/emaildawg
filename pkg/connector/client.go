@@ -367,6 +367,12 @@ func (ec *EmailClient) LogoutRemote(ctx context.Context) {
 }
 
 func (ec *EmailClient) IsLoggedIn() bool {
+	// Graph mode has no IMAP client; login validity is the Graph connection state
+	// (set in Connect). Without this, outgoing Matrix events (replies) are rejected
+	// with "not logged in" since the IMAP check below is always false in Graph mode.
+	if ec.Main != nil && ec.Main.Config.Graph.Enabled {
+		return ec.isConnected.Load()
+	}
 	return ec.IMAPClient != nil && ec.isConnected.Load()
 }
 
