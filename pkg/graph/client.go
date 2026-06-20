@@ -3,6 +3,7 @@ package graph
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -76,6 +77,11 @@ func (c *Client) GetMessage(ctx context.Context, id string) (*GraphMessage, erro
 		return nil, fmt.Errorf("graph GetMessage: read body: %w", err)
 	}
 
+	if resp.StatusCode == http.StatusNotFound {
+		// 404 → the message no longer exists at this id (e.g. hard-deleted or
+		// purged). Surface a sentinel so callers can treat it as a removal.
+		return nil, ErrMessageNotFound
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("graph GetMessage: status %d: %s", resp.StatusCode, body)
 	}
@@ -316,11 +322,25 @@ func (c *Client) ListRecentInbox(ctx context.Context, top int) ([]InboxRef, erro
 	return refs, nil
 }
 
-// SendReply sends a text reply to origMsgID using the createReply→PATCH→send
-// flow: createReply produces a draft with threading + recipients pre-filled,
-// PATCH sets the reply body, send dispatches it. Returns the draft (Graph) id
-// for mapping. Same token/Prefer pattern as SetRead. Non-2xx → error with body.
-func (c *Client) SendReply(ctx context.Context, origMsgID, bodyText string) (string, error) {
+// ReplyAttachment is a file to attach to an outgoing reply (raw bytes + name).
+type ReplyAttachment struct {
+	Name  string
+	Bytes []byte
+}
+
+// SendReply sends a reply to origMsgID using the createReply→(attachments)→send
+// flow. createReply produces a draft with threading + recipients pre-filled; we
+// pass bodyText as the createReply "comment", which Graph inserts ABOVE the
+// quoted original message (so the reply keeps the email correspondence). Any
+// attachments are POSTed to the draft before it is sent. Returns the draft
+// (Graph) id for mapping. Same token/Prefer pattern as SetRead. Non-2xx → error
+// with body.
+//
+// NB: per Graph docs, createReply accepts EITHER a "comment" OR a "body" — never
+// both (sending both is a 400). We use "comment" so the quoted original survives;
+// we deliberately do NOT PATCH the draft body afterwards (that overwrote the
+// quoted original in the previous implementation).
+func (c *Client) SendReply(ctx context.Context, origMsgID, bodyText string, attachments ...ReplyAttachment) (string, error) {
 	token, err := c.tp.Token(ctx)
 	if err != nil {
 		return "", fmt.Errorf("graph SendReply: acquire token: %w", err)
@@ -345,9 +365,11 @@ func (c *Client) SendReply(ctx context.Context, origMsgID, bodyText string) (str
 		return body, resp.StatusCode, err
 	}
 
-	// 1. createReply → draft id
+	// 1. createReply (with comment) → draft id. The comment becomes the reply
+	//    text, inserted above the quoted original by Graph.
+	createPayload, _ := json.Marshal(map[string]string{"comment": bodyText})
 	createURL := fmt.Sprintf("%s/users/%s/messages/%s/createReply", c.base(), c.userID, url.PathEscape(origMsgID))
-	body, status, err := do(http.MethodPost, createURL, []byte("{}"))
+	body, status, err := do(http.MethodPost, createURL, createPayload)
 	if err != nil {
 		return "", fmt.Errorf("graph SendReply: createReply: %w", err)
 	}
@@ -361,17 +383,21 @@ func (c *Client) SendReply(ctx context.Context, origMsgID, bodyText string) (str
 		return "", fmt.Errorf("graph SendReply: parse draft id (body: %s): %w", body, err)
 	}
 
-	// 2. PATCH body
-	patchPayload, _ := json.Marshal(map[string]any{
-		"body": map[string]string{"contentType": "text", "content": bodyText},
-	})
-	patchURL := fmt.Sprintf("%s/users/%s/messages/%s", c.base(), c.userID, url.PathEscape(draft.ID))
-	body, status, err = do(http.MethodPatch, patchURL, patchPayload)
-	if err != nil {
-		return "", fmt.Errorf("graph SendReply: patch draft: %w", err)
-	}
-	if status < 200 || status >= 300 {
-		return "", fmt.Errorf("graph SendReply: patch status %d: %s", status, body)
+	// 2. attachments → POST each to the draft before sending.
+	for i, att := range attachments {
+		attPayload, _ := json.Marshal(map[string]string{
+			"@odata.type":  "#microsoft.graph.fileAttachment",
+			"name":         att.Name,
+			"contentBytes": base64.StdEncoding.EncodeToString(att.Bytes),
+		})
+		attURL := fmt.Sprintf("%s/users/%s/messages/%s/attachments", c.base(), c.userID, url.PathEscape(draft.ID))
+		body, status, err = do(http.MethodPost, attURL, attPayload)
+		if err != nil {
+			return "", fmt.Errorf("graph SendReply: attachment %d (%s): %w", i, att.Name, err)
+		}
+		if status < 200 || status >= 300 {
+			return "", fmt.Errorf("graph SendReply: attachment %d (%s) status %d: %s", i, att.Name, status, body)
+		}
 	}
 
 	// 3. send

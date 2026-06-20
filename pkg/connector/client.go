@@ -15,6 +15,7 @@ import (
 	"maunium.net/go/mautrix/event"
 
 	"github.com/iFixRobots/emaildawg/pkg/coordinator"
+	"github.com/iFixRobots/emaildawg/pkg/graph"
 	"github.com/iFixRobots/emaildawg/pkg/imap"
 	"github.com/iFixRobots/emaildawg/pkg/reliability"
 )
@@ -586,15 +587,23 @@ func (ec *EmailClient) GetUserInfo(ctx context.Context, ghost *bridgev2.Ghost) (
 // HandleMatrixMessage implements the NetworkAPI interface: a Matrix message in
 // an email room is sent as a threaded reply (via Graph) to the email being
 // replied to — explicit ReplyTo if present, else the latest email in the thread.
-// Text-only in v1; messages without a text body are ignored (attachments TODO).
+// Text is sent as the createReply comment (above the quoted original); media
+// messages (image/file/video/audio) are downloaded and attached to the reply.
 func (ec *EmailClient) HandleMatrixMessage(ctx context.Context, msg *bridgev2.MatrixMessage) (*bridgev2.MatrixMessageResponse, error) {
 	log := ec.UserLogin.Log
 	if ec.Main.graphClient == nil {
 		log.Warn().Msg("Matrix message in email room but Graph not configured; ignoring")
 		return &bridgev2.MatrixMessageResponse{DB: nil}, nil
 	}
-	if msg.Content == nil || strings.TrimSpace(msg.Content.Body) == "" {
-		log.Warn().Msg("Matrix message has no text body; ignoring (attachments not yet supported)")
+	if msg.Content == nil {
+		log.Warn().Msg("Matrix message has no content; ignoring")
+		return &bridgev2.MatrixMessageResponse{DB: nil}, nil
+	}
+	hasMedia := msg.Content.URL != "" || msg.Content.File != nil ||
+		msg.Content.MsgType == event.MsgImage || msg.Content.MsgType == event.MsgFile ||
+		msg.Content.MsgType == event.MsgVideo || msg.Content.MsgType == event.MsgAudio
+	if strings.TrimSpace(msg.Content.Body) == "" && !hasMedia {
+		log.Warn().Msg("Matrix message has no text body or media; ignoring")
 		return &bridgev2.MatrixMessageResponse{DB: nil}, nil
 	}
 
@@ -629,11 +638,27 @@ func (ec *EmailClient) HandleMatrixMessage(ctx context.Context, msg *bridgev2.Ma
 		return &bridgev2.MatrixMessageResponse{DB: nil}, nil
 	}
 
-	newID, err := ec.Main.graphClient.SendReply(ctx, graphID, msg.Content.Body)
+	// Body text for the reply. For media messages Content.Body holds the
+	// filename, so use the caption (if present) as the reply text instead.
+	bodyText := msg.Content.Body
+	var attachments []graph.ReplyAttachment
+	if hasMedia {
+		bodyText = msg.Content.GetCaption()
+		data, dlErr := ec.Main.Bridge.Bot.DownloadMedia(ctx, msg.Content.URL, msg.Content.File)
+		if dlErr != nil {
+			return nil, fmt.Errorf("reply: download attachment: %w", dlErr)
+		}
+		attachments = append(attachments, graph.ReplyAttachment{
+			Name:  msg.Content.GetFileName(),
+			Bytes: data,
+		})
+	}
+
+	newID, err := ec.Main.graphClient.SendReply(ctx, graphID, bodyText, attachments...)
 	if err != nil {
 		return nil, fmt.Errorf("reply: send: %w", err)
 	}
-	log.Info().Str("reply_to", internetID).Str("new_id", newID).Msg("reply: sent via Graph")
+	log.Info().Str("reply_to", internetID).Int("attachments", len(attachments)).Str("new_id", newID).Msg("reply: sent via Graph")
 
 	return &bridgev2.MatrixMessageResponse{
 		DB: &database.Message{
