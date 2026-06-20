@@ -1,6 +1,7 @@
 package graph
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -69,4 +70,48 @@ func (c *Client) GetMessage(ctx context.Context, id string) (*GraphMessage, erro
 		return nil, fmt.Errorf("graph GetMessage: parse: %w", err)
 	}
 	return msg, nil
+}
+
+// SetRead marks a message as read or unread via a PATCH request to the Graph
+// API. It follows the same token-acquisition and header pattern as GetMessage.
+// Non-200 responses are returned as an error that includes the response body.
+func (c *Client) SetRead(ctx context.Context, msgID string, isRead bool) error {
+	token, err := c.tp.Token(ctx)
+	if err != nil {
+		return fmt.Errorf("graph SetRead: acquire token: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/users/%s/messages/%s", graphBaseURL, c.userID, msgID)
+
+	isReadStr := "false"
+	if isRead {
+		isReadStr = "true"
+	}
+	payload := []byte(`{"isRead":` + isReadStr + `}`)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, url, bytes.NewReader(payload))
+	if err != nil {
+		return fmt.Errorf("graph SetRead: build request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Add("Prefer", `IdType="ImmutableId"`)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpc.Do(req)
+	if err != nil {
+		return fmt.Errorf("graph SetRead: http: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("graph SetRead: read body: %w", err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("graph SetRead: status %d: %s", resp.StatusCode, body)
+	}
+
+	return nil
 }

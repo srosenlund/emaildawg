@@ -47,6 +47,11 @@ type EmailConnector struct {
 	graphMu          sync.RWMutex // guards graphClientState
 	graphClientState string       // expected clientState for signature validation; access via expectedClientState()
 	webhookQueue     chan webhookItem
+
+	// suppress prevents read-state feedback loops: when the bridge marks a
+	// message read in Graph, it suppresses the resulting Graph webhook so we
+	// don't re-deliver the read event back to Matrix. TTL = 45s.
+	suppress *suppressCache
 }
 
 var (
@@ -151,6 +156,9 @@ func (ec *EmailConnector) Init(bridge *bridgev2.Bridge) {
 	if _, err := bridge.DB.Exec(ctx, `CREATE INDEX IF NOT EXISTS idx_messages_network_remote ON messages(network, remote_id)`); err == nil {
 		bridge.Log.Trace().Msg("Ensured index idx_messages_network_remote on messages(network, remote_id)")
 	}
+
+	// Initialize the suppression cache for Graph read-state loop prevention.
+	ec.suppress = newSuppressCache()
 
 	// Initialize managers
 	logger := bridge.Log.With().Str("component", "imap").Logger()
