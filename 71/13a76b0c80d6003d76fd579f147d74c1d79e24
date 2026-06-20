@@ -1,0 +1,26 @@
+pkg/graph/webhook_test.go
+  s_b85fdc9b24e276::t_9a45a951af0ed5 36,46,49-56,61-63
+  s_b85fdc9b24e276::t_8dc9f0e2002231 37-45,47-48,57-60
+pkg/graph/webhook.go
+  s_b85fdc9b24e276::t_33966006bc92c0 34-36,39
+pkg/connector/connector.go
+  s_b85fdc9b24e276::t_1766b9abcdc4cc 29-30
+  s_b85fdc9b24e276::t_b9f7baf5bafc19 365
+  s_b85fdc9b24e276::t_2460600b0312b6 407
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "7113a76b0c80d6003d76fd579f147d74c1d79e24",
+  "prompts": {},
+  "sessions": {
+    "s_b85fdc9b24e276": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f0c16e0-5afb-482a-a505-6a89b59fb574",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
