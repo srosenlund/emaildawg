@@ -1,0 +1,22 @@
+pkg/graph/token_test.go
+  s_b85fdc9b24e276::t_4d0fe91ccde18e 9,11,13,18
+  s_b85fdc9b24e276::t_695b7e9e4156a0 1-8,10,12,14-17,19-133
+pkg/graph/token.go
+  s_b85fdc9b24e276::t_a51daef65beaee 1-111
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "eff7d69f0082e81a8bd1aea3ebbef0b79fa8cd85",
+  "prompts": {},
+  "sessions": {
+    "s_b85fdc9b24e276": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f0c16e0-5afb-482a-a505-6a89b59fb574",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
