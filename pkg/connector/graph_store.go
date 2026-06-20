@@ -24,7 +24,7 @@ func (eaq *EmailAccountQuery) GetGraphState(ctx context.Context, userMXID, email
 	rows, err := eaq.DB.Query(ctx, `
 		SELECT user_mxid, email, subscription_id, subscription_expiry, client_state, inbox_delta_link
 		FROM graph_state
-		WHERE user_mxid = $1 AND email = $2
+		WHERE user_mxid = ? AND email = ?
 	`, userMXID, email)
 	if err != nil {
 		return nil, fmt.Errorf("graph_state query: %w", err)
@@ -56,7 +56,6 @@ func (eaq *EmailAccountQuery) GetGraphState(ctx context.Context, userMXID, email
 	// Parse the expiry timestamp stored as RFC3339 text.
 	gs.SubscriptionExpiry, err = time.Parse(time.RFC3339, expiryStr)
 	if err != nil {
-		// Fallback: try Unix-time string stored by older code.
 		return nil, fmt.Errorf("graph_state parse expiry %q: %w", expiryStr, err)
 	}
 
@@ -81,7 +80,7 @@ func (eaq *EmailAccountQuery) UpsertGraphState(ctx context.Context, gs *GraphSta
 	_, err = eaq.DB.Exec(ctx, `
 		INSERT OR REPLACE INTO graph_state
 		(user_mxid, email, subscription_id, subscription_expiry, client_state, inbox_delta_link)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		VALUES (?, ?, ?, ?, ?, ?)
 	`, gs.UserMXID, gs.Email, gs.SubscriptionID, expiryStr, encClientState, gs.InboxDeltaLink)
 	if err != nil {
 		return fmt.Errorf("graph_state upsert: %w", err)

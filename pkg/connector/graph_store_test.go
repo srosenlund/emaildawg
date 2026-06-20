@@ -3,6 +3,7 @@ package connector
 import (
 	"context"
 	"database/sql"
+	"os"
 	"testing"
 	"time"
 
@@ -11,6 +12,14 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 )
+
+// TestMain sets the encryption passphrase before any test runs so the
+// process-global sync.Once in database.go always picks it up, regardless of
+// test execution order.
+func TestMain(m *testing.M) {
+	os.Setenv("EMAILDAWG_PASSPHRASE", "test-passphrase-for-unit-tests-only")
+	os.Exit(m.Run())
+}
 
 // newTestDB opens an in-memory SQLite database and returns an EmailAccountQuery
 // backed by it. The caller is responsible for closing db.RawDB when done.
@@ -27,9 +36,6 @@ func newTestDB(t *testing.T) (*EmailAccountQuery, *dbutil.Database) {
 	// Wrap in bridgev2 database.Database (just the embedded dbutil, no migrations needed).
 	bdb := &bridgedb.Database{Database: rawDB}
 	eaq := &EmailAccountQuery{DB: bdb}
-
-	// Set a known passphrase so encryptString/decryptString work deterministically.
-	t.Setenv("EMAILDAWG_PASSPHRASE", "test-passphrase-for-unit-tests-only")
 
 	return eaq, rawDB
 }
@@ -143,5 +149,9 @@ func TestUpsertGraphState_UpdatesExistingRow(t *testing.T) {
 	}
 	if got.InboxDeltaLink != "https://delta/v2" {
 		t.Errorf("expected updated InboxDeltaLink %q, got %q", "https://delta/v2", got.InboxDeltaLink)
+	}
+	// Verify ClientState still decrypts correctly after the second upsert (m2).
+	if got.ClientState != "state-v1" {
+		t.Errorf("expected ClientState %q after second upsert, got %q", "state-v1", got.ClientState)
 	}
 }
