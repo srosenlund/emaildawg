@@ -99,11 +99,14 @@ func (ec *EmailConnector) handleRemovals(ctx context.Context, client *EmailClien
 
 		switch kind {
 		case graph.RemovalArchive:
-			if conversationID == "" {
-				log.Warn().Str("graph_id", graphID).Msg("Graph removal: archive but no conversationId; skipping")
-				continue
-			}
-			client.deliverArchive(ctx, conversationID, internetID)
+			// Outlook→Beeper arkiv (Flow 5) håndteres nu af agent-stefan
+			// beeper-archive-sync EF, der sætter RIGTIG Beeper-arkiv via Beeper
+			// Desktop API. Bridgens gamle deliverArchive satte kun m.lowpriority
+			// (Low Priority, ikke Arkiv) — pensioneret for at undgå dobbelt-
+			// tagging/Low-Priority-artefakt. deliverArchive bevares som dead code
+			// (genaktivér ikke uden at koordinere med EF'en).
+			log.Debug().Str("graph_id", graphID).
+				Msg("Graph removal: archive — håndteres af beeper-archive-sync EF, bridge no-op")
 		case graph.RemovalDelete:
 			if conversationID == "" {
 				// Hard delete (404) — no conversationId available, cannot map to a room.
