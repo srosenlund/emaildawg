@@ -1,0 +1,19 @@
+pkg/connector/graph_removal.go
+  s_72d31500242afc::t_2c96b7f6e8eb35 102-109
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "56701ca3f9e4a5e02e887e075a01f8eff80cc0b8",
+  "prompts": {},
+  "sessions": {
+    "s_72d31500242afc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "95a72c99-163d-4f6e-862e-a0aab03eccc0",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
