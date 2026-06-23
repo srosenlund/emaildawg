@@ -1,0 +1,27 @@
+pkg/connector/connector_test.go
+  s_9cf85e771e8115::t_52b43870faa29b 1-18
+pkg/email/processor.go
+  s_9cf85e771e8115::t_94b82064e91dbe 69-73
+pkg/connector/config.go
+  s_9cf85e771e8115::t_3abdf8610b496a 77-80
+pkg/connector/connector.go
+  s_9cf85e771e8115::t_35aaafe6612c6b 208-212
+  s_9cf85e771e8115::t_aeae22b42dc843 119-122
+  s_9cf85e771e8115::t_f811139122861d 66-81
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.10",
+  "base_commit_sha": "7d378089e1bbddbd0af8534663bd275e258daa3c",
+  "prompts": {},
+  "sessions": {
+    "s_9cf85e771e8115": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3b203c09-9a93-436f-b598-23e6a216aed9",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
