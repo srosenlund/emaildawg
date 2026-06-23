@@ -22,6 +22,9 @@ func TestProcessor_finalizeHTML_ReaderModeOn(t *testing.T) {
 	if !strings.Contains(plain, "Hi there") {
 		t.Fatalf("plaintext missing content: %q", plain)
 	}
+	if !strings.Contains(formatted, "Hi there") {
+		t.Fatalf("reader mode dropped content: %q", formatted)
+	}
 }
 
 func TestProcessor_finalizeHTML_ReaderModeOff(t *testing.T) {

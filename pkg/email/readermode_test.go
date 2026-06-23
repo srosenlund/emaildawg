@@ -130,3 +130,16 @@ func TestToReaderModeHTML_Tables(t *testing.T) {
 		t.Fatalf("nested content lost: %q", got4)
 	}
 }
+
+func TestToReaderModeHTML_DataTableInsideLayout(t *testing.T) {
+	in := `<table role="presentation"><tr><td>` +
+		`<table><tr><th>Name</th></tr><tr><td>Ann</td></tr></table>` +
+		`</td></tr></table>`
+	got, _ := toReaderModeHTML(in, readerModeOptions{MinImgPx: 32})
+	if !strings.Contains(got, "<table") {
+		t.Fatalf("nested data table was dropped: %q", got)
+	}
+	if !strings.Contains(got, "Name") || !strings.Contains(got, "Ann") {
+		t.Fatalf("nested data table content lost: %q", got)
+	}
+}

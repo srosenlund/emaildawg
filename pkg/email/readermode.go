@@ -57,6 +57,7 @@ func toReaderModeHTML(htmlStr string, opts readerModeOptions) (cleanHTML, plainT
 		Data:     "body",
 		DataAtom: atom.Body,
 	})
+	// Defensive: ParseFragment over a strings.Reader has no I/O error path, so this is currently unreachable.
 	if err != nil {
 		clean := sanitizeMatrixHTML(htmlStr)
 		return clean, simpleHTMLToText(clean)
@@ -191,12 +192,12 @@ func isLayoutTable(table *html.Node) bool {
 	return !hasDescendant(table, atom.Th)
 }
 
-func hasDescendant(n *html.Node, a atom.Atom) bool {
+func hasDescendant(n *html.Node, target atom.Atom) bool {
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		if c.Type == html.ElementNode && c.DataAtom == a {
+		if c.Type == html.ElementNode && c.DataAtom == target {
 			return true
 		}
-		if hasDescendant(c, a) {
+		if hasDescendant(c, target) {
 			return true
 		}
 	}
