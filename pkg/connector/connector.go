@@ -63,18 +63,24 @@ var (
 	_ bridgev2.RedactionHandlingNetworkAPI   = (*EmailClient)(nil)
 )
 
+// defaultProcessingConfig is the single source of ProcessingConfig defaults,
+// shared by NewEmailConnector (tests) and Init (production) so they cannot drift.
+func defaultProcessingConfig() ProcessingConfig {
+	return ProcessingConfig{
+		MaxUploadBytes:     DefaultMaxUploadBytes,
+		GzipLargeBodies:    true,
+		ReaderMode:         true,
+		ReaderModeMinImgPx: email.DefaultReaderModeMinImgPx,
+	}
+}
+
 // NewEmailConnector returns an EmailConnector with default config pre-populated.
 // It does not initialise a Bridge or any runtime dependencies; it is intended for
 // testing and for callers that set up the Bridge separately via Init().
 func NewEmailConnector() *EmailConnector {
 	ec := &EmailConnector{}
 	ec.Config = Config{
-		Processing: ProcessingConfig{
-			MaxUploadBytes:     DefaultMaxUploadBytes,
-			GzipLargeBodies:    true,
-			ReaderMode:         true,
-			ReaderModeMinImgPx: email.DefaultReaderModeMinImgPx,
-		},
+		Processing: defaultProcessingConfig(),
 	}
 	return ec
 }
@@ -115,12 +121,7 @@ func (ec *EmailConnector) Init(bridge *bridgev2.Bridge) {
 			Sanitized:       true,
 			PseudonymSecret: "",
 		},
-		Processing: ProcessingConfig{
-			MaxUploadBytes:     DefaultMaxUploadBytes,
-			GzipLargeBodies:    true,
-			ReaderMode:         true,
-			ReaderModeMinImgPx: email.DefaultReaderModeMinImgPx,
-		},
+		Processing: defaultProcessingConfig(),
 	}
 
 	// Allow environment overrides for verbose logging
