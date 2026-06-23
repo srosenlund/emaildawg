@@ -1,0 +1,22 @@
+pkg/email/processor.go
+  s_9cf85e771e8115::t_472d095f666802 1039-1044
+  s_9cf85e771e8115::t_287c0a147dc10e 1753-1767
+pkg/email/processor_test.go
+  s_9cf85e771e8115::t_67c36a06f14f7b 1-36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.10",
+  "base_commit_sha": "7d507bdc3c54fafee0e676ce01f6e1fec5390e3e",
+  "prompts": {},
+  "sessions": {
+    "s_9cf85e771e8115": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3b203c09-9a93-436f-b598-23e6a216aed9",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
