@@ -63,6 +63,22 @@ var (
 	_ bridgev2.RedactionHandlingNetworkAPI   = (*EmailClient)(nil)
 )
 
+// NewEmailConnector returns an EmailConnector with default config pre-populated.
+// It does not initialise a Bridge or any runtime dependencies; it is intended for
+// testing and for callers that set up the Bridge separately via Init().
+func NewEmailConnector() *EmailConnector {
+	ec := &EmailConnector{}
+	ec.Config = Config{
+		Processing: ProcessingConfig{
+			MaxUploadBytes:     DefaultMaxUploadBytes,
+			GzipLargeBodies:    true,
+			ReaderMode:         true,
+			ReaderModeMinImgPx: email.DefaultReaderModeMinImgPx,
+		},
+	}
+	return ec
+}
+
 func (ec *EmailConnector) GetName() bridgev2.BridgeName {
 	return bridgev2.BridgeName{
 		DisplayName:          "EmailDawg",
@@ -100,8 +116,10 @@ func (ec *EmailConnector) Init(bridge *bridgev2.Bridge) {
 			PseudonymSecret: "",
 		},
 		Processing: ProcessingConfig{
-			MaxUploadBytes:  DefaultMaxUploadBytes,
-			GzipLargeBodies: true,
+			MaxUploadBytes:     DefaultMaxUploadBytes,
+			GzipLargeBodies:    true,
+			ReaderMode:         true,
+			ReaderModeMinImgPx: email.DefaultReaderModeMinImgPx,
 		},
 	}
 
@@ -187,6 +205,11 @@ func (ec *EmailConnector) Init(bridge *bridgev2.Bridge) {
 		ec.Processor.MaxUploadBytes = ec.Config.Processing.MaxUploadBytes
 	}
 	ec.Processor.GzipLargeBodies = ec.Config.Processing.GzipLargeBodies
+	ec.Processor.ReaderMode = ec.Config.Processing.ReaderMode
+	ec.Processor.ReaderModeMinImgPx = ec.Config.Processing.ReaderModeMinImgPx
+	if ec.Processor.ReaderModeMinImgPx <= 0 {
+		ec.Processor.ReaderModeMinImgPx = email.DefaultReaderModeMinImgPx
+	}
 	ec.IMAPManager.SetProcessor(ec.Processor)
 
 	// Add commands with connector context

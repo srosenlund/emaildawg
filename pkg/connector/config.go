@@ -74,6 +74,10 @@ type ProcessingConfig struct {
 	MaxUploadBytes int  `yaml:"max_upload_bytes"`
 	// If true, attempt gzip for oversized original HTML/text bodies before attaching.
 	GzipLargeBodies bool `yaml:"gzip_large_bodies"`
+	// ReaderMode enables reader-mode HTML sanitisation (strip clutter, track pixels, etc.).
+	ReaderMode bool `yaml:"reader_mode"`
+	// ReaderModeMinImgPx: inline images at or below this pixel dimension are dropped as tracking pixels.
+	ReaderModeMinImgPx int `yaml:"reader_mode_min_img_px"`
 }
 
 func upgradeConfig(helper up.Helper) {
