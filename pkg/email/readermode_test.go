@@ -19,6 +19,8 @@ func TestSanitizeMatrixHTML(t *testing.T) {
 		{"keeps link", `<a href="https://x.com">l</a>`, []string{`href="https://x.com"`}, nil},
 		{"keeps mxc img", `<img src="mxc://h/abc" alt="a">`, []string{"mxc://h/abc"}, nil},
 		{"keeps basic formatting", `<strong>b</strong><ul><li>i</li></ul>`, []string{"<strong>b</strong>", "<li>i</li>"}, nil},
+		{"strips class attr", `<p class="x">y</p>`, []string{"y"}, []string{"class"}},
+		{"drops javascript href", `<a href="javascript:alert(1)">x</a>`, []string{"x"}, []string{"javascript:"}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

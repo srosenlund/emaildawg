@@ -24,6 +24,7 @@ func newMatrixPolicy() *bluemonday.Policy {
 	)
 	p.AllowElements("a")
 	p.AllowAttrs("href").OnElements("a")
+	p.AllowElements("img")
 	p.AllowAttrs("src", "alt", "title").OnElements("img")
 	p.AllowURLSchemes("http", "https", "mailto", "mxc")
 	// Drop the textual content of these elements entirely, not just the tags.
