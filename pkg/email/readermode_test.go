@@ -55,3 +55,30 @@ func TestToReaderModeHTML_PassThrough(t *testing.T) {
 		t.Fatalf("plaintext wrong: %q", plain)
 	}
 }
+
+func TestToReaderModeHTML_Images(t *testing.T) {
+	opts := readerModeOptions{MinImgPx: 32}
+	cases := []struct {
+		name string
+		in   string
+		keep bool
+	}{
+		{"1x1 tracking", `<img src="mxc://h/track" width="1" height="1">`, false},
+		{"tiny logo 16px", `<img src="mxc://h/logo" width="16" height="16">`, false},
+		{"threshold 32px", `<img src="mxc://h/edge" width="32" height="32">`, false},
+		{"display none", `<img src="mxc://h/x" style="display:none">`, false},
+		{"style px tiny", `<img src="mxc://h/s" style="width:2px;height:2px">`, false},
+		{"hero no dims", `<img src="mxc://h/hero">`, true},
+		{"hero 600px", `<img src="mxc://h/big" width="600" height="400">`, true},
+		{"percent width", `<img src="mxc://h/pct" width="100%">`, true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got, _ := toReaderModeHTML(c.in, opts)
+			has := strings.Contains(got, "mxc://h/")
+			if has != c.keep {
+				t.Fatalf("keep=%v, got html=%q", c.keep, got)
+			}
+		})
+	}
+}

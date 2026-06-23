@@ -2,6 +2,8 @@ package email
 
 import (
 	"bytes"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/microcosm-cc/bluemonday"
@@ -77,8 +79,86 @@ func toReaderModeHTML(htmlStr string, opts readerModeOptions) (cleanHTML, plainT
 	return cleanHTML, plainText
 }
 
-// dropTrackingImages is implemented in Task 3.
-func dropTrackingImages(root *html.Node, minPx int) {}
+var styleDimRe = regexp.MustCompile(`(?i)(width|height)\s*:\s*(\d+)\s*px`)
+
+// dropTrackingImages removes <img> nodes that look like tracking pixels,
+// spacers, or tiny logos (dimension <= minPx, exact 1x1, or display:none).
+func dropTrackingImages(root *html.Node, minPx int) {
+	var toRemove []*html.Node
+	var walk func(n *html.Node)
+	walk = func(n *html.Node) {
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			if c.Type == html.ElementNode && c.DataAtom == atom.Img && isTrackingImage(c, minPx) {
+				toRemove = append(toRemove, c)
+			}
+			walk(c)
+		}
+	}
+	walk(root)
+	for _, n := range toRemove {
+		if n.Parent != nil {
+			n.Parent.RemoveChild(n)
+		}
+	}
+}
+
+func isTrackingImage(img *html.Node, minPx int) bool {
+	w, h := -1, -1
+	var style string
+	for _, a := range img.Attr {
+		switch strings.ToLower(a.Key) {
+		case "width":
+			w = parsePixels(a.Val)
+		case "height":
+			h = parsePixels(a.Val)
+		case "style":
+			style = strings.ToLower(a.Val)
+		}
+	}
+	if strings.Contains(style, "display:none") || strings.Contains(style, "display: none") {
+		return true
+	}
+	if sw := styleDimension(style, "width"); sw >= 0 {
+		w = sw
+	}
+	if sh := styleDimension(style, "height"); sh >= 0 {
+		h = sh
+	}
+	if w >= 0 && w <= minPx {
+		return true
+	}
+	if h >= 0 && h <= minPx {
+		return true
+	}
+	return false
+}
+
+// parsePixels parses "16" or "16px" to an int; returns -1 for non-pixel
+// values such as "100%" or empty strings (treated as "unknown", i.e. keep).
+func parsePixels(s string) int {
+	s = strings.TrimSpace(strings.ToLower(s))
+	s = strings.TrimSuffix(s, "px")
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return -1
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		return -1
+	}
+	return n
+}
+
+func styleDimension(style, prop string) int {
+	for _, m := range styleDimRe.FindAllStringSubmatch(style, -1) {
+		if strings.EqualFold(m[1], prop) {
+			if n, err := strconv.Atoi(m[2]); err == nil {
+				return n
+			}
+		}
+	}
+	return -1
+}
 
 // unwrapLayoutTables is implemented in Task 4.
 func unwrapLayoutTables(root *html.Node) {}
