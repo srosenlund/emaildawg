@@ -38,3 +38,20 @@ func TestSanitizeMatrixHTML(t *testing.T) {
 		})
 	}
 }
+
+func TestToReaderModeHTML_PassThrough(t *testing.T) {
+	in := `<p>Hello <strong>world</strong></p><a href="https://x.com">link</a>`
+	clean, plain := toReaderModeHTML(in, readerModeOptions{MinImgPx: 32})
+	if !strings.Contains(clean, "<strong>world</strong>") {
+		t.Fatalf("formatting lost: %q", clean)
+	}
+	if !strings.Contains(clean, `href="https://x.com"`) {
+		t.Fatalf("link lost: %q", clean)
+	}
+	if strings.Contains(clean, "<html") || strings.Contains(clean, "<body") {
+		t.Fatalf("document wrapper leaked: %q", clean)
+	}
+	if !strings.Contains(plain, "Hello world") || !strings.Contains(plain, "link") {
+		t.Fatalf("plaintext wrong: %q", plain)
+	}
+}
