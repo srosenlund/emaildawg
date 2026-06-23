@@ -1,0 +1,21 @@
+pkg/email/readermode.go
+  s_9cf85e771e8115::t_02905af9f637e6 1-37
+pkg/email/readermode_test.go
+  s_9cf85e771e8115::t_99e233ffacb623 1-38
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.10",
+  "base_commit_sha": "d6c1f53b7501262b0a7b7ea87a824e071d75d071",
+  "prompts": {},
+  "sessions": {
+    "s_9cf85e771e8115": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3b203c09-9a93-436f-b598-23e6a216aed9",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
