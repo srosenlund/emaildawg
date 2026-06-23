@@ -82,3 +82,51 @@ func TestToReaderModeHTML_Images(t *testing.T) {
 		})
 	}
 }
+
+func TestToReaderModeHTML_Tables(t *testing.T) {
+	opts := readerModeOptions{MinImgPx: 32}
+
+	// role=presentation layout table -> unwrapped, content preserved.
+	layout := `<table role="presentation"><tr><td><p>Hello</p></td></tr>` +
+		`<tr><td><p>World</p></td></tr></table>`
+	got, _ := toReaderModeHTML(layout, opts)
+	if strings.Contains(got, "<table") {
+		t.Fatalf("layout table not unwrapped: %q", got)
+	}
+	if !strings.Contains(got, "Hello") || !strings.Contains(got, "World") {
+		t.Fatalf("layout content lost: %q", got)
+	}
+
+	// No <th> -> treated as layout, unwrapped.
+	noTh := `<table><tr><td><p>A</p></td><td><p>B</p></td></tr></table>`
+	got2, _ := toReaderModeHTML(noTh, opts)
+	if strings.Contains(got2, "<table") {
+		t.Fatalf("headerless table not unwrapped: %q", got2)
+	}
+	if !strings.Contains(got2, "A") || !strings.Contains(got2, "B") {
+		t.Fatalf("headerless content lost: %q", got2)
+	}
+
+	// Data table with <th> -> preserved.
+	data := `<table><tr><th>Name</th><th>Age</th></tr>` +
+		`<tr><td>Ann</td><td>30</td></tr></table>`
+	got3, _ := toReaderModeHTML(data, opts)
+	if !strings.Contains(got3, "<table") {
+		t.Fatalf("data table dropped: %q", got3)
+	}
+	if !strings.Contains(got3, "Ann") || !strings.Contains(got3, "Name") {
+		t.Fatalf("data content lost: %q", got3)
+	}
+
+	// Nested layout tables flatten completely.
+	nested := `<table role="presentation"><tr><td>` +
+		`<table role="presentation"><tr><td><p>Deep</p></td></tr></table>` +
+		`</td></tr></table>`
+	got4, _ := toReaderModeHTML(nested, opts)
+	if strings.Contains(got4, "<table") {
+		t.Fatalf("nested layout not flattened: %q", got4)
+	}
+	if !strings.Contains(got4, "Deep") {
+		t.Fatalf("nested content lost: %q", got4)
+	}
+}

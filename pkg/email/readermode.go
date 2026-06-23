@@ -160,5 +160,78 @@ func styleDimension(style, prop string) int {
 	return -1
 }
 
-// unwrapLayoutTables is implemented in Task 4.
-func unwrapLayoutTables(root *html.Node) {}
+// unwrapLayoutTables linearises tables used purely for layout (role=presentation
+// or no <th>) into document flow, while leaving genuine data tables intact.
+// Tables are processed deepest-first so nested layout tables flatten fully.
+func unwrapLayoutTables(root *html.Node) {
+	var tables []*html.Node
+	var walk func(n *html.Node)
+	walk = func(n *html.Node) {
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			walk(c)
+			if c.Type == html.ElementNode && c.DataAtom == atom.Table {
+				tables = append(tables, c) // post-order: children appended before parents
+			}
+		}
+	}
+	walk(root)
+	for _, t := range tables {
+		if isLayoutTable(t) {
+			linearizeTable(t)
+		}
+	}
+}
+
+func isLayoutTable(table *html.Node) bool {
+	for _, a := range table.Attr {
+		if strings.EqualFold(a.Key, "role") && strings.EqualFold(strings.TrimSpace(a.Val), "presentation") {
+			return true
+		}
+	}
+	return !hasDescendant(table, atom.Th)
+}
+
+func hasDescendant(n *html.Node, a atom.Atom) bool {
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		if c.Type == html.ElementNode && c.DataAtom == a {
+			return true
+		}
+		if hasDescendant(c, a) {
+			return true
+		}
+	}
+	return false
+}
+
+// linearizeTable replaces a layout table with the child nodes of its cells,
+// in document order, dropping the table/tbody/tr/td wrappers.
+func linearizeTable(table *html.Node) {
+	parent := table.Parent
+	if parent == nil {
+		return
+	}
+	var content []*html.Node
+	var collect func(n *html.Node)
+	collect = func(n *html.Node) {
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			if c.Type == html.ElementNode && (c.DataAtom == atom.Td || c.DataAtom == atom.Th) {
+				for child := c.FirstChild; child != nil; child = child.NextSibling {
+					content = append(content, child)
+				}
+			} else {
+				collect(c)
+			}
+		}
+	}
+	collect(table)
+
+	for _, n := range content {
+		if n.Parent != nil {
+			n.Parent.RemoveChild(n)
+		}
+	}
+	for _, n := range content {
+		parent.InsertBefore(n, table)
+	}
+	parent.RemoveChild(table)
+}
