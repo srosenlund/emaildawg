@@ -1036,10 +1036,12 @@ func (e *EmailMatrixEvent) ConvertMessage(ctx context.Context, portal *bridgev2.
 	// Add HTML formatting if available
 	if origHTML != "" && origHTML != e.emailMessage.TextContent {
 		content.Format = event.FormatHTML
-		// Decode HTML entities in the formatted body before sending to Matrix
-		content.FormattedBody = html.UnescapeString(origHTML)
-		// Filter out invisible Unicode characters from HTML content too
-		content.FormattedBody = filterInvisibleUnicode(content.FormattedBody)
+		formatted, plain := e.processor.finalizeHTML(origHTML)
+		content.FormattedBody = formatted
+		// In reader mode, prefer the cleaned plaintext as the body fallback.
+		if plain != "" {
+			content.Body = plain
+		}
 	}
 
 	// Ensure body isn't empty - if we have HTML but no text, try to extract from HTML
@@ -1746,6 +1748,21 @@ func filterInvisibleUnicode(s string) string {
 	}
 
 	return result.String()
+}
+
+// finalizeHTML produces the Matrix formatted body (and, in reader mode, a
+// cleaned plaintext fallback) from the post-MXC email HTML.
+func (p *Processor) finalizeHTML(origHTML string) (formatted, plain string) {
+	if p.ReaderMode {
+		minPx := p.ReaderModeMinImgPx
+		if minPx <= 0 {
+			minPx = DefaultReaderModeMinImgPx
+		}
+		return toReaderModeHTML(origHTML, readerModeOptions{MinImgPx: minPx})
+	}
+	// Legacy path: decode entities + strip invisible Unicode, no plaintext rewrite.
+	formatted = filterInvisibleUnicode(html.UnescapeString(origHTML))
+	return formatted, ""
 }
 
 // generateParticipantChangeMessage creates a timeline message for participant changes
