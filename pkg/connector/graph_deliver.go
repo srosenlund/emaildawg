@@ -73,6 +73,70 @@ func (ec *EmailClient) deliverGraphMessage(ctx context.Context, g *graph.GraphMe
 	}
 }
 
+// deliverAttachmentBackfill enqueues a bilag-only message for a historical mail
+// that was bridged before attachments were supported. It targets the SAME thread
+// portal as the original mail but uses a distinct, deterministic MessageID
+// ("email-att:<imi>") so:
+//   - it is NOT deduped against the original text message (different ID), and
+//   - re-running the backfill is idempotent (bridgev2 dedups the SAME att-id).
+//
+// The original text event is left untouched, so no duplicate text appears. On
+// fetch failure or when there are no deliverable attachments at all, it logs and
+// skips rather than posting an empty/garbage message.
+func (ec *EmailClient) deliverAttachmentBackfill(ctx context.Context, g *graph.GraphMessage) {
+	if !g.HasAttachments {
+		return
+	}
+	itemCount := 0
+	if ec.Main != nil && ec.Main.graphClient != nil {
+		atts, n, err := ec.Main.graphClient.FetchAttachments(ctx, ec.Email, g.ID)
+		if err != nil {
+			ec.UserLogin.Log.Warn().Err(err).Str("message_id", g.ID).Msg("attachment-backfill: FetchAttachments failed; skipping")
+			return
+		}
+		g.Attachments = atts
+		itemCount = n
+	} else {
+		ec.UserLogin.Log.Warn().Str("message_id", g.ID).Msg("attachment-backfill: no graphClient; skipping")
+		return
+	}
+	if len(g.Attachments) == 0 && itemCount == 0 {
+		// hasAttachments was true but nothing deliverable came back (e.g. only
+		// inline images already rendered, or a transient empty result): skip.
+		return
+	}
+
+	maxUpload := int64(DefaultMaxUploadBytes)
+	if ec.Main != nil && ec.Main.Config.Processing.MaxUploadBytes != 0 {
+		maxUpload = int64(ec.Main.Config.Processing.MaxUploadBytes)
+	}
+
+	evt := &simplevent.Message[*graph.GraphMessage]{
+		EventMeta: simplevent.EventMeta{
+			Type: bridgev2.RemoteEventMessage,
+			PortalKey: networkid.PortalKey{
+				ID:       networkid.PortalID("thread:" + g.ConversationID),
+				Receiver: ec.UserLogin.ID,
+			},
+			Sender: bridgev2.EventSender{
+				Sender: networkid.UserID("email:" + g.FromAddress),
+			},
+			CreatePortal: true,
+			Timestamp:    g.ReceivedDateTime,
+		},
+		// Distinct, deterministic ID → not deduped vs the text msg; idempotent on re-run.
+		ID:   networkid.MessageID("email-att:" + g.InternetMessageID),
+		Data: g,
+		ConvertMessageFunc: func(ctx context.Context, portal *bridgev2.Portal, intent bridgev2.MatrixAPI, d *graph.GraphMessage) (*bridgev2.ConvertedMessage, error) {
+			return convertAttachmentBackfillMessage(ctx, intent, d, itemCount, maxUpload)
+		},
+	}
+
+	if res := ec.UserLogin.QueueRemoteEvent(evt); !res.Success {
+		ec.UserLogin.Log.Error().Str("message_id", g.ID).Msg("attachment-backfill: queue failed")
+	}
+}
+
 // convertGraphMessage builds the bridgev2 ConvertedMessage for a Graph email:
 // part 1 is the subject+body text, followed by one media part per file
 // attachment (capped at maxAttachmentParts), an over-cap notice per too-large
@@ -97,6 +161,25 @@ func convertGraphMessage(ctx context.Context, intent bridgev2.MatrixAPI, g *grap
 		},
 	}
 
+	parts = appendAttachmentParts(ctx, intent, parts, g, itemCount, maxUploadBytes)
+	return &bridgev2.ConvertedMessage{Parts: parts}, nil
+}
+
+// appendAttachmentParts appends, in order: one media part per file attachment
+// (capped at maxAttachmentParts, an over-cap file becomes a notice inside
+// email.ConvertAttachmentPart), a single "+N flere bilag" overflow notice when the
+// file count exceeds the cap, and an item-attachment notice when itemCount>0.
+// PartIDs are deterministic ("att-<i>-<sanitized-navn>") so re-delivery/backfill
+// is idempotent. Shared by the live delivery (convertGraphMessage) and the
+// attachment-backfill message (convertAttachmentBackfillMessage).
+func appendAttachmentParts(
+	ctx context.Context,
+	intent bridgev2.MatrixAPI,
+	parts []*bridgev2.ConvertedMessagePart,
+	g *graph.GraphMessage,
+	itemCount int,
+	maxUploadBytes int64,
+) []*bridgev2.ConvertedMessagePart {
 	for i, att := range g.Attachments {
 		if i >= maxAttachmentParts {
 			break
@@ -142,6 +225,29 @@ func convertGraphMessage(ctx context.Context, intent bridgev2.MatrixAPI, g *grap
 		})
 	}
 
+	return parts
+}
+
+// convertAttachmentBackfillMessage builds the bilag-only message used by the
+// attachment backfill. It is delivered as a SEPARATE Matrix message in the same
+// thread (distinct MessageID "email-att:<imi>"), NOT a re-delivery of the original
+// mail — re-delivering would duplicate the already-visible text event (bridgev2's
+// DeleteAllParts only clears the DB mapping, it does not redact the old event).
+// Part 1 is a "📎 Bilag til tidligere mail: <subject>" header notice; the file
+// media parts + notices follow via the shared appendAttachmentParts. No m.text
+// part is emitted, so the original mail's body is never duplicated.
+func convertAttachmentBackfillMessage(ctx context.Context, intent bridgev2.MatrixAPI, g *graph.GraphMessage, itemCount int, maxUploadBytes int64) (*bridgev2.ConvertedMessage, error) {
+	parts := []*bridgev2.ConvertedMessagePart{
+		{
+			ID:   networkid.PartID("att-backfill-header"),
+			Type: event.EventMessage,
+			Content: &event.MessageEventContent{
+				MsgType: event.MsgNotice,
+				Body:    fmt.Sprintf("📎 Bilag til tidligere mail: %s", g.Subject),
+			},
+		},
+	}
+	parts = appendAttachmentParts(ctx, intent, parts, g, itemCount, maxUploadBytes)
 	return &bridgev2.ConvertedMessage{Parts: parts}, nil
 }
 

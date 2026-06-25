@@ -377,6 +377,11 @@ func (ec *EmailConnector) Start(ctx context.Context) error {
 	// One-shot clean inbox rebuild (EMAILDAWG_REBUILD_INBOX=1). No-op unless set.
 	go ec.forceRebuildInbox(ctx)
 
+	// One-shot attachment backfill (EMAILDAWG_BACKFILL_ATTACHMENTS=1): re-delivers
+	// bilag for mails bridged before attachment support, as separate bilag-messages.
+	// No-op unless set.
+	go ec.backfillAttachments(ctx)
+
 	// Periodically ensure the user is joined to all email rooms — live webhook
 	// rooms aren't reliably auto-joined on Beeper (disable with EMAILDAWG_JOINHEAL=off).
 	go ec.ensureJoinedLoop(ctx)
