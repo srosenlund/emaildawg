@@ -24,6 +24,15 @@ type GraphAttachment struct {
 	ContentID   string
 }
 
+// GraphAttachment satisfies the email.MatrixAttachment interface
+// (GetName/GetContentType/GetSize/GetBytes) by structure, so the Graph delivery
+// path can hand its attachments straight to email.ConvertAttachmentPart without
+// an adapter or importing the email package here.
+func (a GraphAttachment) GetName() string        { return a.Name }
+func (a GraphAttachment) GetContentType() string { return a.ContentType }
+func (a GraphAttachment) GetSize() int64         { return a.Size }
+func (a GraphAttachment) GetBytes() []byte       { return a.Bytes }
+
 // graphAttachmentJSON mirrors the Graph API JSON shape for an attachment in the
 // GET /messages/{id}/attachments collection. ContentBytes is absent for
 // itemAttachments (#microsoft.graph.itemAttachment).

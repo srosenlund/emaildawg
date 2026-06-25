@@ -1547,6 +1547,11 @@ func bestFilename(att *EmailAttachment, fallback string) string {
 	return "inline"
 }
 
+// SanitizeFilename is the exported form of sanitizeFilename, used by the Graph
+// delivery path to build the same deterministic "att-<i>-<sanitized>" PartIDs as
+// the IMAP path (processor.go), keeping re-delivery idempotent across sources.
+func SanitizeFilename(name string) string { return sanitizeFilename(name) }
+
 // sanitizeFilename removes path separators, trims control chars, and bounds length.
 func sanitizeFilename(name string) string {
 	name = strings.TrimSpace(name)
