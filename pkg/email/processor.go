@@ -1242,9 +1242,9 @@ func (e *EmailMatrixEvent) ConvertMessage(ctx context.Context, portal *bridgev2.
 		if usedInline[idx] {
 			continue
 		}
-		if attachmentPart, err := e.convertAttachmentToMatrix(ctx, attachment, intent); err == nil {
+		partID := fmt.Sprintf("att-%d-%s", idx+1, sanitizeFilename(attachment.Filename))
+		if attachmentPart, err := ConvertAttachmentPart(ctx, attachment, intent, partID, int64(e.processor.MaxUploadBytes)); err == nil {
 			if attachmentPart != nil {
-				attachmentPart.ID = networkid.PartID(fmt.Sprintf("att-%d-%s", idx+1, sanitizeFilename(attachment.Filename)))
 				parts = append(parts, attachmentPart)
 			}
 		} else {
@@ -1417,64 +1417,71 @@ func truncateUTF8PreserveWords(s string, maxBytes int) (string, bool) {
 	return s[:cut], true
 }
 
-// convertAttachmentToMatrix uploads an email attachment to Matrix and returns a ConvertedMessagePart
-func (e *EmailMatrixEvent) convertAttachmentToMatrix(ctx context.Context, attachment *EmailAttachment, intent bridgev2.MatrixAPI) (*bridgev2.ConvertedMessagePart, error) {
-	e.processor.log.Debug().
-		Str("filename", attachment.Filename).
-		Str("content_type", attachment.ContentType).
-		Int64("size", attachment.Size).
-		Msg("Uploading email attachment to Matrix")
+// ConvertAttachmentPart uploads a source-independent attachment to Matrix and
+// returns a ConvertedMessagePart. It is shared by the IMAP and Graph delivery
+// paths. If the attachment exceeds maxUploadBytes (when > 0), it returns a
+// notice part ("📎 for stor til at sende: <navn>") rather than an error, so the
+// rest of the message can still be delivered. The returned part carries the
+// supplied deterministic partID.
+func ConvertAttachmentPart(ctx context.Context, att MatrixAttachment, intent bridgev2.MatrixAPI, partID string, maxUploadBytes int64) (*bridgev2.ConvertedMessagePart, error) {
+	name := att.GetName()
+	contentType := att.GetContentType()
+	size := att.GetSize()
 
-	// Enforce upload size limit for general attachments
-	if e.processor.MaxUploadBytes > 0 && attachment.Size > int64(e.processor.MaxUploadBytes) {
-		return nil, fmt.Errorf("attachment exceeds upload limit (%d bytes > %d bytes)", attachment.Size, e.processor.MaxUploadBytes)
+	// Enforce upload size limit: over cap → notice part, not an error.
+	if maxUploadBytes > 0 && size > maxUploadBytes {
+		notice := &event.MessageEventContent{
+			MsgType: event.MsgNotice,
+			Body:    fmt.Sprintf("📎 for stor til at sende: %s", name),
+		}
+		return &bridgev2.ConvertedMessagePart{
+			ID:      networkid.PartID(partID),
+			Type:    event.EventMessage,
+			Content: notice,
+		}, nil
 	}
 
 	// Sanitize filename for upload
-	safeName := sanitizeFilename(attachment.Filename)
+	safeName := sanitizeFilename(name)
 	if safeName == "" {
-		safeName = bestFilename(attachment, "attachment")
-		safeName = sanitizeFilename(safeName)
+		if name != "" {
+			safeName = sanitizeFilename(name)
+		} else {
+			safeName = sanitizeFilename("attachment")
+		}
 	}
+
 	// Upload the attachment data to Matrix media repository
-	uploadResp, _, err := intent.UploadMedia(ctx, "", attachment.Data, safeName, attachment.ContentType)
+	uploadResp, _, err := intent.UploadMedia(ctx, "", att.GetBytes(), safeName, contentType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to upload attachment to Matrix: %w", err)
 	}
 
 	// Determine the message type based on content type
-	msgType := e.getMessageTypeForAttachment(attachment.ContentType)
+	msgType := getMessageTypeForAttachment(contentType)
 
 	// Create the Matrix message content for the attachment
 	content := &event.MessageEventContent{
 		MsgType: msgType,
-		Body:    attachment.Filename,
+		Body:    name,
 		URL:     uploadResp,
 	}
 
 	// Add basic file info - Matrix will handle the appropriate type
 	content.Info = &event.FileInfo{
-		MimeType: attachment.ContentType,
-		Size:     int(attachment.Size),
+		MimeType: contentType,
+		Size:     int(size),
 	}
 
-	// For images and videos, we could add more specific info in the future
-	// but for now, basic FileInfo works for all types
-
-	e.processor.log.Info().
-		Str("filename", attachment.Filename).
-		Str("matrix_url", string(content.URL)).
-		Str("msg_type", string(msgType)).
-		Msg("Successfully uploaded attachment to Matrix")
-
 	return &bridgev2.ConvertedMessagePart{
+		ID:      networkid.PartID(partID),
 		Type:    event.EventMessage,
 		Content: content,
 	}, nil
 }
 
 // getMessageTypeForAttachment determines the appropriate Matrix message type for an attachment
-func (e *EmailMatrixEvent) getMessageTypeForAttachment(contentType string) event.MessageType {
+func getMessageTypeForAttachment(contentType string) event.MessageType {
 	switch {
 	case strings.HasPrefix(contentType, "image/"):
 		return event.MsgImage

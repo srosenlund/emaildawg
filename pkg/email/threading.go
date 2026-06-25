@@ -22,6 +22,22 @@ type EmailAttachment struct {
 	IsInline        bool   // derived: Disposition == inline or referenced in HTML
 }
 
+// MatrixAttachment is a source-independent view of an attachment that can be
+// uploaded to Matrix. Both the IMAP-path EmailAttachment and the Graph-path
+// attachment type implement it, so ConvertAttachmentPart works for either.
+type MatrixAttachment interface {
+	GetName() string
+	GetContentType() string
+	GetSize() int64
+	GetBytes() []byte
+}
+
+// EmailAttachment implements MatrixAttachment.
+func (a *EmailAttachment) GetName() string        { return a.Filename }
+func (a *EmailAttachment) GetContentType() string { return a.ContentType }
+func (a *EmailAttachment) GetSize() int64         { return a.Size }
+func (a *EmailAttachment) GetBytes() []byte       { return a.Data }
+
 // EmailThread represents an email conversation thread
 type EmailThread struct {
 	ThreadID     string   // Message-ID of the first email in thread
