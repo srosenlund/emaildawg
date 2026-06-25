@@ -1,0 +1,31 @@
+pkg/graph/attachments.go
+  s_66c2ba3440b313::t_d2b1a82fa041f4 131-214
+  s_66c2ba3440b313::t_39ecec0fad3763 11-12
+pkg/connector/graph_backfill_attachments_test.go
+  s_66c2ba3440b313::t_063d95a5328c21 1-84
+pkg/connector/graph_deliver.go
+  s_66c2ba3440b313::t_350754fe53c881 76-139
+  s_66c2ba3440b313::t_192dd820d48cf2 164-182,228-250
+pkg/connector/graph_backfill_attachments.go
+  s_66c2ba3440b313::t_1c7cea9bac8b32 1-87
+pkg/connector/connector.go
+  s_66c2ba3440b313::t_66921d1a64200d 380-384
+pkg/graph/attachments_list_test.go
+  s_66c2ba3440b313::t_b9cc29e85d336d 1-102
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.1",
+  "base_commit_sha": "f5bc7d9e53f5e6e914dffac9f7549cec567d0540",
+  "prompts": {},
+  "sessions": {
+    "s_66c2ba3440b313": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c5c2f05a-a1de-4f7a-bfb3-7cd464a2175e",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
