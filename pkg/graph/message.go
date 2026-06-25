@@ -26,6 +26,9 @@ type GraphMessage struct {
 	IsRead             bool
 	HasAttachments     bool
 	ReceivedDateTime   time.Time
+	// Attachments is populated lazily by the deliver layer via
+	// Client.FetchAttachments; the delta/message parser leaves it nil.
+	Attachments []GraphAttachment
 }
 
 // graphMessageJSON mirrors the Graph API JSON shape for a message resource.
