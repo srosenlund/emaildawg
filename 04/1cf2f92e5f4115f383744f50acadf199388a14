@@ -1,0 +1,24 @@
+pkg/email/attachment_part_test.go
+  s_66c2ba3440b313::t_927807922f08b1 1-108
+pkg/email/processor.go
+  s_66c2ba3440b313::t_b58d3b5689b289 1245-1246
+  s_66c2ba3440b313::t_7a60ec50013055 1420-1441,1445,1447-1451,1453,1455,1461,1466,1472-1473,1477,1484
+pkg/email/threading.go
+  s_66c2ba3440b313::t_761540b3ed0630 25-40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.1",
+  "base_commit_sha": "041cf2f92e5f4115f383744f50acadf199388a14",
+  "prompts": {},
+  "sessions": {
+    "s_66c2ba3440b313": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c5c2f05a-a1de-4f7a-bfb3-7cd464a2175e",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
