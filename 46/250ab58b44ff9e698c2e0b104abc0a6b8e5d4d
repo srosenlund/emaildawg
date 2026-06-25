@@ -1,0 +1,28 @@
+pkg/email/processor.go
+  s_66c2ba3440b313::t_eaa9cdc98f334d 1550-1554
+pkg/graph/attachments.go
+  s_66c2ba3440b313::t_4c4a8d8d7b8eb6 27-35
+pkg/connector/graph_deliver_test.go
+  s_66c2ba3440b313::t_1177f8af2a00dc 1-137
+pkg/connector/graph_deliver.go
+  s_66c2ba3440b313::t_65f204ae92ebed 28-50,67,76-145
+  s_66c2ba3440b313::t_d3b68002dafd6d 5,15,19-22
+  s_66c2ba3440b313::t_a46dddfb954187 23
+  s_66c2ba3440b313::t_8b515fe628ffc7 146-147
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.1",
+  "base_commit_sha": "46250ab58b44ff9e698c2e0b104abc0a6b8e5d4d",
+  "prompts": {},
+  "sessions": {
+    "s_66c2ba3440b313": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c5c2f05a-a1de-4f7a-bfb3-7cd464a2175e",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
