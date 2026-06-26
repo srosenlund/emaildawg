@@ -1,0 +1,21 @@
+docker-entrypoint.sh
+  s_66c2ba3440b313::t_0c5f60c111deba 4-12
+Dockerfile.sliplane
+  s_66c2ba3440b313::t_38b9b5b3f70987 19-22,24-30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.1",
+  "base_commit_sha": "efcf2dc8d9645d346265753cd67ec8b372bd3cfb",
+  "prompts": {},
+  "sessions": {
+    "s_66c2ba3440b313": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c5c2f05a-a1de-4f7a-bfb3-7cd464a2175e",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
