@@ -1,6 +1,7 @@
 package connector
 
 import (
+	htmlpkg "html"
 	"context"
 	"fmt"
 	"time"
@@ -64,7 +65,7 @@ func (ec *EmailClient) deliverGraphMessage(ctx context.Context, g *graph.GraphMe
 		ID:   networkid.MessageID("email:" + g.InternetMessageID),
 		Data: g,
 		ConvertMessageFunc: func(ctx context.Context, portal *bridgev2.Portal, intent bridgev2.MatrixAPI, d *graph.GraphMessage) (*bridgev2.ConvertedMessage, error) {
-			return convertGraphMessage(ctx, intent, d, itemCount, maxUpload)
+			return convertGraphMessage(ctx, intent, d, itemCount, maxUpload, ec.Main.Processor)
 		},
 	}
 
@@ -145,19 +146,35 @@ func (ec *EmailClient) deliverAttachmentBackfill(ctx context.Context, g *graph.G
 // count exceeds the cap. PartIDs are deterministic ("att-<i>-<sanitized-navn>")
 // so re-delivery/backfill is idempotent. Kept standalone (no portal/queue deps)
 // so it is unit-testable with a mock intent.
-func convertGraphMessage(ctx context.Context, intent bridgev2.MatrixAPI, g *graph.GraphMessage, itemCount int, maxUploadBytes int64) (*bridgev2.ConvertedMessage, error) {
+func convertGraphMessage(ctx context.Context, intent bridgev2.MatrixAPI, g *graph.GraphMessage, itemCount int, maxUploadBytes int64, proc *email.Processor) (*bridgev2.ConvertedMessage, error) {
+	// HTML-mails rendes gennem reader-pipelinen (hygiejne + bulk-pruning +
+	// polish) til en pæn FormattedBody; plaintext-fallback bruges som Body.
+	var formatted, plainBody string
+	if g.BodyHTML != "" && proc != nil && proc.ReaderMode {
+		extract := g.IsBulk && proc.ReaderModeExtract
+		formatted, plainBody = email.RenderHTMLForMatrix(g.BodyHTML, proc.ReaderModeMinImgPx, extract)
+	}
+	if plainBody == "" {
+		plainBody = g.BodyText
+	}
 	body := g.Subject
-	if g.BodyText != "" {
-		body = g.Subject + "\n\n" + g.BodyText
+	if plainBody != "" {
+		body = g.Subject + "\n\n" + plainBody
+	}
+
+	content := &event.MessageEventContent{
+		MsgType: event.MsgText,
+		Body:    body,
+	}
+	if formatted != "" {
+		content.Format = event.FormatHTML
+		content.FormattedBody = "<p><strong>" + htmlpkg.EscapeString(g.Subject) + "</strong></p>" + formatted
 	}
 
 	parts := []*bridgev2.ConvertedMessagePart{
 		{
-			Type: event.EventMessage,
-			Content: &event.MessageEventContent{
-				MsgType: event.MsgText,
-				Body:    body,
-			},
+			Type:    event.EventMessage,
+			Content: content,
 		},
 	}
 

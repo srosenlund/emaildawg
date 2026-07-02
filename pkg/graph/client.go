@@ -44,10 +44,14 @@ func (c *Client) base() string {
 	return c.baseURL
 }
 
+// messageSelectFields covers everything parseGraphMessage maps, plus
+// internetMessageHeaders (kræver eksplicit $select) til IsBulk-detektion.
+const messageSelectFields = "id,internetMessageId,conversationId,parentFolderId,subject,isRead,hasAttachments,receivedDateTime,body,from,toRecipients,internetMessageHeaders"
+
 // GetMessage fetches a single message by Graph message ID from the client's
 // mailbox. It sends two Prefer headers:
 //   - Prefer: IdType="ImmutableId"   (stable immutable message IDs)
-//   - Prefer: outlook.body-content-type="text"  (plain-text body)
+//   - Prefer: outlook.body-content-type="html"  (HTML body til reader-mode-rendering)
 //
 // Non-200 responses are returned as an error that includes the response body.
 func (c *Client) GetMessage(ctx context.Context, id string) (*GraphMessage, error) {
@@ -56,7 +60,7 @@ func (c *Client) GetMessage(ctx context.Context, id string) (*GraphMessage, erro
 		return nil, fmt.Errorf("graph GetMessage: acquire token: %w", err)
 	}
 
-	msgURL := fmt.Sprintf("%s/users/%s/messages/%s", graphBaseURL, c.userID, url.PathEscape(id))
+	msgURL := fmt.Sprintf("%s/users/%s/messages/%s?$select=%s", graphBaseURL, c.userID, url.PathEscape(id), messageSelectFields)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, msgURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("graph GetMessage: build request: %w", err)
@@ -64,7 +68,7 @@ func (c *Client) GetMessage(ctx context.Context, id string) (*GraphMessage, erro
 
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Add("Prefer", `IdType="ImmutableId"`)
-	req.Header.Add("Prefer", `outlook.body-content-type="text"`)
+	req.Header.Add("Prefer", `outlook.body-content-type="html"`)
 
 	resp, err := c.httpc.Do(req)
 	if err != nil {

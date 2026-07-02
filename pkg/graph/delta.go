@@ -90,7 +90,7 @@ func (c *Client) DeltaPage(ctx context.Context, url string) (msgs []*GraphMessag
 
 	isInitial := url == ""
 	if isInitial {
-		url = fmt.Sprintf("%s/users/%s/mailFolders/inbox/messages/delta", graphBaseURL, c.userID)
+		url = fmt.Sprintf("%s/users/%s/mailFolders/inbox/messages/delta?$select=%s", graphBaseURL, c.userID, messageSelectFields)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -100,7 +100,7 @@ func (c *Client) DeltaPage(ctx context.Context, url string) (msgs []*GraphMessag
 
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Add("Prefer", `IdType="ImmutableId"`)
-	req.Header.Add("Prefer", `outlook.body-content-type="text"`)
+	req.Header.Add("Prefer", `outlook.body-content-type="html"`)
 	if isInitial {
 		req.Header.Add("Prefer", "odata.maxpagesize=50")
 	}

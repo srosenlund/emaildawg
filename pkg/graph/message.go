@@ -1,6 +1,7 @@
 package graph
 
 import (
+	"strings"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -23,6 +24,10 @@ type GraphMessage struct {
 	FromAddress        string
 	To                 []Addr
 	BodyText           string
+	// BodyHTML is set when Graph returns an HTML body (Prefer: body-content-type="html").
+	BodyHTML string
+	// IsBulk marks newsletters/marketing (List-Unsubscribe or Precedence: bulk/list).
+	IsBulk bool
 	IsRead             bool
 	HasAttachments     bool
 	ReceivedDateTime   time.Time
@@ -57,6 +62,10 @@ type graphMessageJSON struct {
 			Address string `json:"address"`
 		} `json:"emailAddress"`
 	} `json:"toRecipients"`
+	InternetMessageHeaders []struct {
+		Name  string `json:"name"`
+		Value string `json:"value"`
+	} `json:"internetMessageHeaders"`
 }
 
 // parseGraphMessage unmarshals a Graph API message JSON payload into a GraphMessage.
@@ -84,7 +93,7 @@ func parseGraphMessage(data []byte) (*GraphMessage, error) {
 		})
 	}
 
-	return &GraphMessage{
+	m := &GraphMessage{
 		ID:               raw.ID,
 		InternetMessageID: raw.InternetMessageID,
 		ConversationID:   raw.ConversationID,
@@ -93,9 +102,25 @@ func parseGraphMessage(data []byte) (*GraphMessage, error) {
 		FromName:         raw.From.EmailAddress.Name,
 		FromAddress:      raw.From.EmailAddress.Address,
 		To:               to,
-		BodyText:         raw.Body.Content,
 		IsRead:           raw.IsRead,
 		HasAttachments:   raw.HasAttachments,
 		ReceivedDateTime: received,
-	}, nil
+	}
+	if strings.EqualFold(raw.Body.ContentType, "html") {
+		m.BodyHTML = raw.Body.Content
+	} else {
+		m.BodyText = raw.Body.Content
+	}
+	for _, h := range raw.InternetMessageHeaders {
+		switch {
+		case strings.EqualFold(h.Name, "List-Unsubscribe"):
+			m.IsBulk = true
+		case strings.EqualFold(h.Name, "Precedence"):
+			v := strings.ToLower(strings.TrimSpace(h.Value))
+			if v == "bulk" || v == "list" {
+				m.IsBulk = true
+			}
+		}
+	}
+	return m, nil
 }

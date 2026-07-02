@@ -2,12 +2,14 @@ package connector
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"maunium.net/go/mautrix/bridgev2"
 	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/id"
 
+	"github.com/iFixRobots/emaildawg/pkg/email"
 	"github.com/iFixRobots/emaildawg/pkg/graph"
 )
 
@@ -41,7 +43,7 @@ func TestConvertGraphMessage_AttachmentsAndNotices(t *testing.T) {
 	const itemCount = 1
 	intent := &mockDeliverIntent{}
 
-	conv, err := convertGraphMessage(context.Background(), intent, g, itemCount, 25*1024*1024)
+	conv, err := convertGraphMessage(context.Background(), intent, g, itemCount, 25*1024*1024, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -96,7 +98,7 @@ func TestConvertGraphMessage_TextOnly(t *testing.T) {
 	g := &graph.GraphMessage{Subject: "Emne", BodyText: "Krop"}
 	intent := &mockDeliverIntent{}
 
-	conv, err := convertGraphMessage(context.Background(), intent, g, 0, 25*1024*1024)
+	conv, err := convertGraphMessage(context.Background(), intent, g, 0, 25*1024*1024, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -119,7 +121,7 @@ func TestConvertGraphMessage_OverflowNotice(t *testing.T) {
 	g := &graph.GraphMessage{Subject: "S", HasAttachments: true, Attachments: atts}
 	intent := &mockDeliverIntent{}
 
-	conv, err := convertGraphMessage(context.Background(), intent, g, 0, 25*1024*1024)
+	conv, err := convertGraphMessage(context.Background(), intent, g, 0, 25*1024*1024, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -133,5 +135,30 @@ func TestConvertGraphMessage_OverflowNotice(t *testing.T) {
 	}
 	if intent.uploadCalls != maxAttachmentParts {
 		t.Fatalf("expected %d uploads, got %d", maxAttachmentParts, intent.uploadCalls)
+	}
+}
+
+func TestConvertGraphMessage_HTMLReaderMode(t *testing.T) {
+	g := &graph.GraphMessage{
+		Subject:  "Nyhedsbrev",
+		BodyHTML: `<div style="display:none">PREHEADER</div><h1>Overskrift</h1><p>Indhold her.</p>`,
+	}
+	proc := &email.Processor{ReaderMode: true, ReaderModeMinImgPx: 32, ReaderModeExtract: true}
+	conv, err := convertGraphMessage(context.Background(), nil, g, 0, 25*1024*1024, proc)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	content := conv.Parts[0].Content
+	if content.FormattedBody == "" || content.Format != event.FormatHTML {
+		t.Fatalf("expected HTML formatted body, got %+v", content)
+	}
+	if strings.Contains(content.FormattedBody, "PREHEADER") || strings.Contains(content.Body, "PREHEADER") {
+		t.Fatalf("hidden preheader leaked: %q", content.FormattedBody)
+	}
+	if strings.Contains(content.FormattedBody, "<h1") {
+		t.Fatalf("h1 not demoted: %q", content.FormattedBody)
+	}
+	if !strings.Contains(content.Body, "Indhold her.") || !strings.Contains(content.Body, "Nyhedsbrev") {
+		t.Fatalf("plain body wrong: %q", content.Body)
 	}
 }
