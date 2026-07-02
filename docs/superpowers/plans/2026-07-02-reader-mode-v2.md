@@ -770,3 +770,12 @@ Sliplane-servicen (`sh-emaildawg` under stefan-rosenlund) bygger fra GitHub. Bru
 **Placeholder-scan:** Ingen TBD/TODO; al kode komplet. Task 1's pipeline-snippet viser `pruneBulkContent`-kaldet som Task 2-aktiveret — eksplicit markeret, ikke en placeholder.
 
 **Type-konsistens:** `readerModeOptions{MinImgPx, Extract}` ens i Task 1/2/3. `pruneBulkContent(container *html.Node)` defineret Task 2, kaldt Task 2 (readermode.go). `isBulkHeaders(textproto.MIMEHeader) bool` defineret + testet Task 3. `finalizeHTML(string, bool)` signatur ens i definition + kaldssted. `textOf`/`hasDescendant` defineret Task 1/eksisterende, brugt Task 2. Imports: processor.go har allerede `bufio`, `bytes`, `textproto`, `imap` (bruges af extractReferencesFromHeaders).
+
+---
+
+## Udfaldslog (2026-07-02, implementeret + live-verificeret)
+
+- Task 1-3 gennemført som planlagt; /code-review high fandt 10 CONFIRMED fejl som alle blev rettet før deploy (regex-boundaries, mso-hide/font-size-semantik, separator/entity/nbsp-bevarelse, pass-orden, heading-clamp, CTA-zone-gate, Init-config-klobring).
+- **Scope-tilføjelse under Task 4:** rodårsagen til al grim formattering var Graph-læse-stien (prod bruger IKKE IMAP-processoren): den hentede kun plaintext (`Prefer: outlook.body-content-type="text"`) og satte aldrig FormattedBody. Fix: Graph henter nu HTML + internetMessageHeaders ($select), GraphMessage fik BodyHTML/IsBulk, og convertGraphMessage kører reader-pipelinen via ny `email.RenderHTMLForMatrix`.
+- Live-verificeret i Beeper: skjult preheader væk, junk-unicode væk, h1→h3, dobbelt-entities dekodet, br/separator-kollaps, subject som fed header, links/fed bevaret.
+- Lag 2 (bulk-pruning) verificeres ved næste rigtige nyhedsbrev (List-Unsubscribe kan ikke fakes via Graph sendMail). Kill-switch: `reader_mode_extract: false` (kræver reader_mode_min_img_px sat samtidig pga. bool-zero-ambiguitet, jf. mergeProcessingConfig).
