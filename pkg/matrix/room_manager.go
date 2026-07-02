@@ -11,6 +11,7 @@ import (
 	"maunium.net/go/mautrix/bridgev2/database"
 	"maunium.net/go/mautrix/bridgev2/networkid"
 	"maunium.net/go/mautrix/event"
+	"maunium.net/go/mautrix/id"
 
 	"github.com/iFixRobots/emaildawg/pkg/email"
 	"github.com/iFixRobots/emaildawg/pkg/common"
@@ -27,6 +28,12 @@ func NewRoomManager(log *zerolog.Logger) *RoomManager {
 	return &RoomManager{
 		log: &logger,
 	}
+}
+
+// outlookRoomAvatar: Outlook-logo (pre-uploadet mxc) som rum-avatar for email-tråde.
+var outlookRoomAvatar = &bridgev2.Avatar{
+	ID:  networkid.AvatarID("outlook-logo-v1"),
+	MXC: id.ContentURIString("mxc://local.beeper.com/stefanrosenlund_5TjQTmGOQ6Cjf9ZdXo0K6IqtWky6MTGGhRTvkQhBzEUOXEPrnaw5CECy561BN5tX"),
 }
 
 // GetChatInfoForThread creates ChatInfo for an email thread (used by bridgev2 for room creation)
@@ -89,9 +96,10 @@ func (rm *RoomManager) GetChatInfoForThread(ctx context.Context, thread *email.E
 		},
 	}
 	chatInfo := &bridgev2.ChatInfo{
-		Name:  ptr.Ptr(roomName),
-		Topic: ptr.Ptr(roomTopic),
-		Type:  ptr.Ptr(database.RoomTypeDefault),
+		Name:   ptr.Ptr(roomName),
+		Topic:  ptr.Ptr(roomTopic),
+		Avatar: outlookRoomAvatar,
+		Type:   ptr.Ptr(database.RoomTypeDefault),
 		Members: &bridgev2.ChatMemberList{
 			IsFull:           true,
 			TotalMemberCount: len(memberMap),

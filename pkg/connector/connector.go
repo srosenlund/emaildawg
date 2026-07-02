@@ -106,6 +106,13 @@ func NewEmailConnector() *EmailConnector {
 	return ec
 }
 
+// outlookAvatar: Outlook-logo (pre-uploadet til hungryserv) som rum-avatar
+// for alle email-tråde, så bridgede mails er visuelt genkendelige i Beeper.
+var outlookAvatar = &bridgev2.Avatar{
+	ID:  networkid.AvatarID("outlook-logo-v1"),
+	MXC: id.ContentURIString("mxc://local.beeper.com/stefanrosenlund_5TjQTmGOQ6Cjf9ZdXo0K6IqtWky6MTGGhRTvkQhBzEUOXEPrnaw5CECy561BN5tX"),
+}
+
 func (ec *EmailConnector) GetName() bridgev2.BridgeName {
 	return bridgev2.BridgeName{
 		DisplayName:          "EmailDawg",
@@ -659,7 +666,7 @@ func (ec *EmailConnector) GetChatInfo(ctx context.Context, portal *bridgev2.Port
 	chatInfo := &bridgev2.ChatInfo{
 		Name:   &roomName,
 		Topic:  &roomTopic,
-		Avatar: nil,
+		Avatar: outlookAvatar,
 		Type:   ptr.Ptr(database.RoomTypeDefault),
 		Members: &bridgev2.ChatMemberList{
 			IsFull:           true,
