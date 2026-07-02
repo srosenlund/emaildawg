@@ -258,6 +258,15 @@ func (ec *EmailConnector) LoadUserLogin(ctx context.Context, login *bridgev2.Use
 }
 
 func (ec *EmailClient) Connect(ctx context.Context) {
+	// Beeper-sidepanelet viser "<remote_name> · <bridge-id>" for ukendte netværk;
+	// normalisér fra den raa email-adresse til et laesbart navn.
+	if ec.UserLogin.RemoteName != "E-mail" {
+		ec.UserLogin.RemoteName = "E-mail"
+		if err := ec.UserLogin.Save(ctx); err != nil {
+			ec.UserLogin.Log.Warn().Err(err).Msg("Kunne ikke gemme normaliseret remote_name")
+		}
+	}
+
 	// Graph mode: mail is delivered exclusively via Microsoft Graph webhooks
 	// (subscription wired up in EmailConnector.Start → ensureGraphSubscription).
 	// There is no IMAP client and no IDLE loop, so the IMAP-based auth_failure
