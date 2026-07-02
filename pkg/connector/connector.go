@@ -110,7 +110,7 @@ func (ec *EmailConnector) GetName() bridgev2.BridgeName {
 	return bridgev2.BridgeName{
 		DisplayName:          "EmailDawg",
 		NetworkURL:           "https://en.wikipedia.org/wiki/Email",
-		NetworkIcon:          "mxc://maunium.net/YgtkucQxWlKJxwMBJR6Ggz5w", // Email icon
+		NetworkIcon:          "mxc://local.beeper.com/stefanrosenlund_5TjQTmGOQ6Cjf9ZdXo0K6IqtWky6MTGGhRTvkQhBzEUOXEPrnaw5CECy561BN5tX", // Outlook-logo (2018-2024)
 		NetworkID:            "email",
 		BeeperBridgeType:     "email",
 		DefaultPort:          29319, // Different from WhatsApp's 29318
