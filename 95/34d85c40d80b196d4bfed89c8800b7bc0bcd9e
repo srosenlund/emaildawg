@@ -1,0 +1,21 @@
+pkg/connector/connector.go
+  s_ddeace781fc7d0::t_0e215f818daf9c 109-115,669
+pkg/matrix/room_manager.go
+  s_ddeace781fc7d0::t_9725468d723048 14,33-38,99-102
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.9",
+  "base_commit_sha": "9534d85c40d80b196d4bfed89c8800b7bc0bcd9e",
+  "prompts": {},
+  "sessions": {
+    "s_ddeace781fc7d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1a35a2f9-f475-415b-b3b4-dc3ade490a3a",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
