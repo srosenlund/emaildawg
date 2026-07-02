@@ -1,0 +1,29 @@
+pkg/connector/graph_deliver.go
+  s_ddeace781fc7d0::t_d3599cfb9e2661 4,68,149-159,161-171,176-177
+pkg/connector/graph_deliver_test.go
+  s_ddeace781fc7d0::t_39e9e38bc5a2d9 5,12,46,101,124,140-164
+pkg/email/render.go
+  s_ddeace781fc7d0::t_e5f89ebabb1931 1-12
+pkg/graph/client.go
+  s_ddeace781fc7d0::t_b8b44d45bbddcf 47-50,54,63,71
+pkg/graph/delta.go
+  s_ddeace781fc7d0::t_f96e33173d8dda 93,103
+pkg/graph/message.go
+  s_ddeace781fc7d0::t_5a115fc723b57a 4,27-30,65-68,96,108-125
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.9",
+  "base_commit_sha": "8b4a03189be118e5c76749e704d305a27df8a019",
+  "prompts": {},
+  "sessions": {
+    "s_ddeace781fc7d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1a35a2f9-f475-415b-b3b4-dc3ade490a3a",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
