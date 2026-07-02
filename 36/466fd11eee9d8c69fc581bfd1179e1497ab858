@@ -1,0 +1,31 @@
+pkg/connector/example-config.yaml
+  s_ddeace781fc7d0::t_4198e3bf2f9e4c 52-57
+pkg/connector/config.go
+  s_ddeace781fc7d0::t_055d7c4b33489d 109-111
+pkg/connector/connector.go
+  s_ddeace781fc7d0::t_7e2b1bb14886a1 66-78,138-140
+pkg/email/extract.go
+  s_ddeace781fc7d0::t_71120d025b2904 62-66,69-78
+pkg/email/extract_test.go
+  s_ddeace781fc7d0::t_2b306438700d43 26-28,30-47
+pkg/email/readermode.go
+  s_ddeace781fc7d0::t_cde1e6075bb3f3 81,252-260,271-275,278,292-300,314-316,340-343,395-397,459-462
+pkg/email/readermode_test.go
+  s_ddeace781fc7d0::t_399eaf098ecd3a 153,202,207-209,213-273
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.9",
+  "base_commit_sha": "36466fd11eee9d8c69fc581bfd1179e1497ab858",
+  "prompts": {},
+  "sessions": {
+    "s_ddeace781fc7d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1a35a2f9-f475-415b-b3b4-dc3ade490a3a",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
