@@ -1,0 +1,21 @@
+pkg/email/extract_test.go
+  s_ddeace781fc7d0::t_17d4c3da7a3c3b 1-42
+pkg/email/extract.go
+  s_ddeace781fc7d0::t_81a64e48d753dc 1-128
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.9",
+  "base_commit_sha": "4df50b744d62d4aa4e44c84602449a8472a56bac",
+  "prompts": {},
+  "sessions": {
+    "s_ddeace781fc7d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1a35a2f9-f475-415b-b3b4-dc3ade490a3a",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
