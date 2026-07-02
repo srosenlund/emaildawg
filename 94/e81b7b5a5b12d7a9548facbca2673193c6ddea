@@ -1,0 +1,29 @@
+pkg/email/threading.go
+  s_ddeace781fc7d0::t_50fb5b60daccdd 180-182
+pkg/email/processor_bulk_test.go
+  s_ddeace781fc7d0::t_4d994a2fa85fa0 1-27
+pkg/connector/config.go
+  s_ddeace781fc7d0::t_3362cb04eccbd1 81-82
+pkg/connector/connector.go
+  s_ddeace781fc7d0::t_83ce0396cd4486 74,212
+pkg/email/processor.go
+  s_ddeace781fc7d0::t_16fcca4e1b328a 71-72,280-281,656-684,1072,1800,1806-1809
+pkg/email/processor_test.go
+  s_ddeace781fc7d0::t_b28db8b26c33fd 12,32
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.9",
+  "base_commit_sha": "94e81b7b5a5b12d7a9548facbca2673193c6ddea",
+  "prompts": {},
+  "sessions": {
+    "s_ddeace781fc7d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1a35a2f9-f475-415b-b3b4-dc3ade490a3a",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
