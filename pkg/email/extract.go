@@ -59,23 +59,23 @@ func pruneBulkContent(container *html.Node) {
 		}
 		lower := strings.ToLower(b.text)
 		ld := linkDensity(b.node)
-
-		// Ren link-suppe: høj link-densitet og kort tekst (nav/social/CTA-rækker)
-		if ld > 0.5 && len(b.text) < 200 {
-			b.drop = true
-			continue
-		}
-		// Footer-nøgleord i bund-zonen
-		if i >= bottomZone {
-			for _, kw := range footerKeywords {
-				if strings.Contains(lower, kw) {
-					b.drop = true
-					break
-				}
+		kwHit := false
+		for _, kw := range footerKeywords {
+			if strings.Contains(lower, kw) {
+				kwHit = true
+				break
 			}
 		}
-		// Rene social-rækker
-		if !b.drop && ld > 0.8 && isSocialRow(lower) {
+		linkSoup := ld > 0.5 && len(b.text) < 200
+
+		// Link-suppe alene fælder KUN i bund-zonen — en kort CTA
+		// ("Read the full report her") midt i mailen er ofte hovedindholdet.
+		switch {
+		case kwHit && (i >= bottomZone || linkSoup):
+			b.drop = true
+		case linkSoup && i >= bottomZone:
+			b.drop = true
+		case ld > 0.8 && isSocialRow(lower):
 			b.drop = true
 		}
 	}

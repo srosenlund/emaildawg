@@ -23,13 +23,28 @@ func TestPruneBulkContent_DropsFooterAndSocial(t *testing.T) {
 }
 
 func TestPruneBulkContent_RetentionGuardFallsBack(t *testing.T) {
-	// Alt ligner footer/link-suppe → pruning ville fjerne >60% → guard skal give Lag 1-output uændret
-	in := `<p><a href="https://a">A</a></p><p><a href="https://b">B</a></p><p><a href="https://c">C</a></p>`
+	// To store keyword-blokke ville fjerne >60% af teksten → guard skal give Lag 1-output uændret
+	kw := `<p><a href="https://x/u">Unsubscribe alle nyhedsbreve og opdateringer fra afsenderen med det samme</a></p>`
+	in := `<p>Kort.</p>` + kw + kw
 	clean, _ := toReaderModeHTML(in, readerModeOptions{MinImgPx: 32, Extract: true})
-	for _, keep := range []string{">A<", ">B<", ">C<"} {
-		if !strings.Contains(clean, keep) {
-			t.Fatalf("retention guard failed, content dropped: %q", clean)
-		}
+	if !strings.Contains(clean, "Unsubscribe alle") || !strings.Contains(clean, "Kort.") {
+		t.Fatalf("retention guard failed, content dropped: %q", clean)
+	}
+}
+
+func TestPruneBulkContent_MidBodyCTAPreserved(t *testing.T) {
+	// En kort link-tung CTA midt i mailen er ofte hovedindholdet — må ikke prunes.
+	in := `<p>Vi har udgivet årets store rapport om det nordiske marked med analyser og data fra hele branchen.</p>` +
+		`<p><a href="https://x.com/report">Læs hele rapporten her</a></p>` +
+		`<p>Rapporten dækker fonde, exits og dealflow over de sidste tolv måneder med kommentarer fra aktørerne.</p>` +
+		`<p>Med venlig hilsen fra hele redaktionen bag årets udgivelse.</p>` +
+		`<p><a href="https://x.com/unsub">Unsubscribe</a> · <a href="https://x.com/browser">View in browser</a></p>`
+	clean, plain := toReaderModeHTML(in, readerModeOptions{MinImgPx: 32, Extract: true})
+	if !strings.Contains(clean, "Læs hele rapporten her") {
+		t.Fatalf("mid-body CTA pruned: %q", clean)
+	}
+	if strings.Contains(plain, "Unsubscribe") {
+		t.Fatalf("footer survived: %q", plain)
 	}
 }
 

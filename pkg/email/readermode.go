@@ -77,8 +77,8 @@ func toReaderModeHTML(htmlStr string, opts readerModeOptions) (cleanHTML, plainT
 	if opts.Extract {
 		pruneBulkContent(container)
 	}
-	stripJunkUnicode(container)
 	decodeStableEntities(container)
+	stripJunkUnicode(container)
 	collapseNoise(container)
 	demoteHeadings(container)
 
@@ -249,7 +249,15 @@ func linearizeTable(table *html.Node) {
 }
 
 // hiddenStyleRe matches inline styles that hide content (preheaders, spacers).
-var hiddenStyleRe = regexp.MustCompile(`(?i)display\s*:\s*none|visibility\s*:\s*hidden|opacity\s*:\s*0(?:[;\s"]|$)|font-size\s*:\s*[01]px|font-size\s*:\s*0(?:[;\s"]|$)|max-height\s*:\s*0|mso-hide\s*:\s*all`)
+// Left-boundary anchors prevent matching backface-visibility/fill-opacity;
+// trailing guards prevent max-height:0.5em. mso-hide:all is deliberately NOT
+// here — it hides only in Outlook, every other client shows the content.
+var hiddenStyleRe = regexp.MustCompile(`(?i)(?:^|[;"'\s])(?:display\s*:\s*none|visibility\s*:\s*hidden|opacity\s*:\s*0(?:\.0+)?\s*(?:;|$)|max-height\s*:\s*0(?:px)?\s*(?:;|$))`)
+
+// fontSizeHiddenRe: font-size:0/1px preheader trick. Only safe to treat as
+// hidden on LEAF elements — newsletters put font-size:0 on wrappers whose
+// children reset their own size (fluid-hybrid whitespace hack).
+var fontSizeHiddenRe = regexp.MustCompile(`(?i)(?:^|[;"'\s])font-size\s*:\s*[01](?:px)?\s*(?:;|$)`)
 
 // dropHiddenElements removes any element whose inline style hides it.
 // Generalises the img-only hidden check to all elements (hidden preheader text).
@@ -260,10 +268,14 @@ func dropHiddenElements(root *html.Node) {
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
 			if c.Type == html.ElementNode {
 				for _, a := range c.Attr {
-					if strings.EqualFold(a.Key, "style") && hiddenStyleRe.MatchString(a.Val) {
-						toRemove = append(toRemove, c)
-						break
+					if !strings.EqualFold(a.Key, "style") {
+						continue
 					}
+					if hiddenStyleRe.MatchString(a.Val) ||
+						(fontSizeHiddenRe.MatchString(a.Val) && !hasElementChild(c)) {
+						toRemove = append(toRemove, c)
+					}
+					break
 				}
 			}
 			walk(c)
@@ -275,6 +287,15 @@ func dropHiddenElements(root *html.Node) {
 			n.Parent.RemoveChild(n)
 		}
 	}
+}
+
+func hasElementChild(n *html.Node) bool {
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		if c.Type == html.ElementNode {
+			return true
+		}
+	}
+	return false
 }
 
 // isJunkRune reports preheader-padding characters. Deliberately a conservative
@@ -290,7 +311,9 @@ func isJunkRune(r rune) bool {
 	return false
 }
 
-var nbspRunRe = regexp.MustCompile(`[\x{00A0} \t]{4,}`)
+// nbspRunRe: only very long nbsp/space runs are preheader padding —
+// short runs are deliberate alignment/indentation and must survive.
+var nbspRunRe = regexp.MustCompile(`[\x{00A0} \t]{30,}`)
 
 // stripJunkUnicode removes preheader-padding runes from text nodes and
 // collapses long nbsp/space runs. Skips pre/code content.
@@ -314,7 +337,10 @@ var entityRe = regexp.MustCompile(`&(?:[a-zA-Z]{2,10}|#\d{1,7});`)
 func decodeStableEntities(root *html.Node) {
 	walkTextNodes(root, func(n *html.Node) {
 		if entityRe.MatchString(n.Data) {
-			n.Data = htmlpkg.UnescapeString(n.Data)
+			// Dekod KUN de matchede tokens (kræver semikolon) — en hel-streng
+			// UnescapeString ville også dekode legacy-entities uden semikolon
+			// (&copy, &reg) og korrumpere URL-query-params.
+			n.Data = entityRe.ReplaceAllStringFunc(n.Data, htmlpkg.UnescapeString)
 		}
 	})
 }
@@ -366,7 +392,9 @@ func collapseNoise(root *html.Node) {
 		}
 	}
 
-	// separator-runs i tekst-noder → <hr> hvis noden kun er separatoren
+	// separator-runs → <hr> KUN når tekst-noden ikke er andet end separatoren.
+	// Runs inde i blandet tekst (PGP-armor, "-----Original Message-----",
+	// blanket-linjer "Navn: ____") skal bevares urørt.
 	walkTextNodes(root, func(n *html.Node) {
 		trimmed := strings.TrimSpace(n.Data)
 		if trimmed != "" && separatorRunRe.ReplaceAllString(trimmed, "") == "" {
@@ -375,8 +403,6 @@ func collapseNoise(root *html.Node) {
 				hr := &html.Node{Type: html.ElementNode, Data: "hr", DataAtom: atom.Hr}
 				n.Parent.InsertBefore(hr, n)
 			}
-		} else {
-			n.Data = separatorRunRe.ReplaceAllString(n.Data, "")
 		}
 	})
 
@@ -430,6 +456,10 @@ func demoteHeadings(root *html.Node) {
 					c.Data, c.DataAtom = "h3", atom.H3
 				case atom.H2:
 					c.Data, c.DataAtom = "h4", atom.H4
+				case atom.H3:
+					c.Data, c.DataAtom = "h5", atom.H5
+				case atom.H4, atom.H5:
+					c.Data, c.DataAtom = "h6", atom.H6
 				}
 			}
 			walk(c)

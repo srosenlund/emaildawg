@@ -148,10 +148,9 @@ func TestReaderModeV2_HiddenElementsDropped(t *testing.T) {
 	in := `<div style="display:none">PREHEADER JUNK</div>` +
 		`<div style="max-height:0px;overflow:hidden">MORE JUNK</div>` +
 		`<span style="font-size:1px">TINY</span>` +
-		`<span style="mso-hide:all">MSO</span>` +
 		`<p>Synligt indhold</p>`
 	clean, plain := toReaderModeHTML(in, readerModeOptions{MinImgPx: 32})
-	for _, junk := range []string{"PREHEADER JUNK", "MORE JUNK", "TINY", "MSO"} {
+	for _, junk := range []string{"PREHEADER JUNK", "MORE JUNK", "TINY"} {
 		if strings.Contains(clean, junk) || strings.Contains(plain, junk) {
 			t.Fatalf("hidden element leaked %q: %q", junk, clean)
 		}
@@ -200,12 +199,75 @@ func TestReaderModeV2_CollapseNoise(t *testing.T) {
 }
 
 func TestReaderModeV2_HeadingsDemoted(t *testing.T) {
-	in := `<h1>Stor</h1><h2>Mellem</h2><h3>Fin</h3>`
+	in := `<h1>Stor</h1><h2>Mellem</h2><h3>Fin</h3><h5>Mindst</h5>`
 	clean, _ := toReaderModeHTML(in, readerModeOptions{MinImgPx: 32})
 	if strings.Contains(clean, "<h1") || strings.Contains(clean, "<h2") {
 		t.Fatalf("h1/h2 not demoted: %q", clean)
 	}
-	if !strings.Contains(clean, "<h3>Stor</h3>") || !strings.Contains(clean, "<h4>Mellem</h4>") || !strings.Contains(clean, "<h3>Fin</h3>") {
+	// Uniform -2 med clamp: hierarkiet må aldrig invertere (h2>h3 skal forblive h4>h5)
+	if !strings.Contains(clean, "<h3>Stor</h3>") || !strings.Contains(clean, "<h4>Mellem</h4>") ||
+		!strings.Contains(clean, "<h5>Fin</h5>") || !strings.Contains(clean, "<h6>Mindst</h6>") {
 		t.Fatalf("demotion wrong: %q", clean)
+	}
+}
+
+
+func TestReaderModeV2_LegitStylesNotHidden(t *testing.T) {
+	// backface-visibility/fill-opacity/max-height:0.5em/mso-hide/font-size:0-wrapper
+	// er IKKE skjult indhold — review-fund: manglende regex-boundaries åd hele mails.
+	in := `<div style="backface-visibility:hidden"><p>Anti-flicker indhold</p></div>` +
+		`<div style="max-height:0.5em">Klemt men synlig</div>` +
+		`<span style="mso-hide:all">Vises udenfor Outlook</span>` +
+		`<div style="font-size:0"><p style="font-size:14px">Fluid-hybrid indhold</p></div>`
+	clean, _ := toReaderModeHTML(in, readerModeOptions{MinImgPx: 32})
+	for _, keep := range []string{"Anti-flicker indhold", "Klemt men synlig", "Vises udenfor Outlook", "Fluid-hybrid indhold"} {
+		if !strings.Contains(clean, keep) {
+			t.Fatalf("legitimate content dropped %q: %q", keep, clean)
+		}
+	}
+}
+
+func TestReaderModeV2_MixedTextSeparatorsPreserved(t *testing.T) {
+	// PGP-armor og Outlook-separatorer i blandet tekst må ikke lemlæstes.
+	in := `<p>-----BEGIN PGP SIGNATURE-----</p><p>Navn: __________ (udfyld)</p>`
+	clean, _ := toReaderModeHTML(in, readerModeOptions{MinImgPx: 32})
+	if !strings.Contains(clean, "-----BEGIN PGP SIGNATURE-----") {
+		t.Fatalf("PGP armor destroyed: %q", clean)
+	}
+	if !strings.Contains(clean, "__________") {
+		t.Fatalf("blank-fill line destroyed: %q", clean)
+	}
+}
+
+func TestReaderModeV2_EntityDecodePreservesBareAmpParams(t *testing.T) {
+	// &copy uden semikolon i URL-tekst må ikke blive © (review-fund: hel-strengs UnescapeString).
+	in := `<p>Se &amp;quot;spec&amp;quot; på example.com/?page=1&amp;copy=2</p>`
+	_, plain := toReaderModeHTML(in, readerModeOptions{MinImgPx: 32})
+	if !strings.Contains(plain, `"spec"`) {
+		t.Fatalf("double-encoded quote not decoded: %q", plain)
+	}
+	if !strings.Contains(plain, "copy=2") || strings.Contains(plain, "©") {
+		t.Fatalf("URL param corrupted: %q", plain)
+	}
+}
+
+func TestReaderModeV2_DoubleEncodedJunkStripped(t *testing.T) {
+	// Pass-orden: dekod før strip, så dobbelt-encodet zwsp-padding også fjernes.
+	in := `<p>Intro&amp;#8203;&amp;#8203;&amp;#8203;tekst</p>`
+	clean, _ := toReaderModeHTML(in, readerModeOptions{MinImgPx: 32})
+	if strings.Contains(clean, "\u200b") || strings.Contains(clean, "​") {
+		t.Fatalf("double-encoded zwsp survived: %q", clean)
+	}
+	if !strings.Contains(clean, "Intro") || !strings.Contains(clean, "tekst") {
+		t.Fatalf("content lost: %q", clean)
+	}
+}
+
+func TestReaderModeV2_ShortNbspAlignmentPreserved(t *testing.T) {
+	// Korte nbsp-runs er bevidst alignment (fakturaer) — kun lange runs er padding.
+	in := "<p>Total       1.200 kr</p>"
+	clean, _ := toReaderModeHTML(in, readerModeOptions{MinImgPx: 32})
+	if !strings.Contains(clean, "   ") {
+		t.Fatalf("short nbsp alignment collapsed: %q", clean)
 	}
 }

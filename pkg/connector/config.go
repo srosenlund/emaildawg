@@ -106,6 +106,9 @@ func upgradeConfig(helper up.Helper) {
 	// Email processing configuration
 	helper.Copy(up.Int, "email_processing", "max_upload_bytes")
 	helper.Copy(up.Bool, "email_processing", "gzip_large_bodies")
+	helper.Copy(up.Bool, "email_processing", "reader_mode")
+	helper.Copy(up.Int, "email_processing", "reader_mode_min_img_px")
+	helper.Copy(up.Bool, "email_processing", "reader_mode_extract")
 
 	// Logging configuration
 	helper.Copy(up.Bool, "logging", "sanitized")
