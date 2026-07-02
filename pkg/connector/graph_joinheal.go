@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"maunium.net/go/mautrix/bridgev2"
+	"maunium.net/go/mautrix/event"
 )
 
 const (
@@ -92,5 +93,31 @@ func (ec *EmailConnector) ensureAllPortalsJoined(ctx context.Context) {
 	if failed > 0 || joined > 0 {
 		log.Info().Int("portals", len(portals)).Int("ensured", joined).Int("failed", failed).
 			Msg("join-heal: ensured user joined to email rooms")
+	}
+
+	// Avatar-heal: eksisterende rum fra før Outlook-logoet fik aldrig et
+	// portal-info-update (det sker kun ved nye beskeder). Sæt rum-avataren
+	// direkte på alle rum der mangler den — idempotent via AvatarID-guard.
+	healed := 0
+	for _, p := range withMXID {
+		if p.AvatarID == outlookRoomAvatarID {
+			continue
+		}
+		_, err := ec.Bridge.Bot.SendState(ctx, p.MXID, event.StateRoomAvatar, "", &event.Content{
+			Parsed: &event.RoomAvatarEventContent{URL: outlookAvatar.MXC},
+		}, time.Time{})
+		if err != nil {
+			log.Debug().Err(err).Stringer("room", p.MXID).Msg("avatar-heal: SendState failed")
+			continue
+		}
+		p.AvatarID = outlookRoomAvatarID
+		p.AvatarMXC = outlookAvatar.MXC
+		if err := p.Save(ctx); err != nil {
+			log.Debug().Err(err).Stringer("room", p.MXID).Msg("avatar-heal: save failed")
+		}
+		healed++
+	}
+	if healed > 0 {
+		log.Info().Int("healed", healed).Msg("avatar-heal: satte Outlook-logo på eksisterende rum")
 	}
 }
