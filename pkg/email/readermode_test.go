@@ -143,3 +143,69 @@ func TestToReaderModeHTML_DataTableInsideLayout(t *testing.T) {
 		t.Fatalf("nested data table content lost: %q", got)
 	}
 }
+
+func TestReaderModeV2_HiddenElementsDropped(t *testing.T) {
+	in := `<div style="display:none">PREHEADER JUNK</div>` +
+		`<div style="max-height:0px;overflow:hidden">MORE JUNK</div>` +
+		`<span style="font-size:1px">TINY</span>` +
+		`<span style="mso-hide:all">MSO</span>` +
+		`<p>Synligt indhold</p>`
+	clean, plain := toReaderModeHTML(in, readerModeOptions{MinImgPx: 32})
+	for _, junk := range []string{"PREHEADER JUNK", "MORE JUNK", "TINY", "MSO"} {
+		if strings.Contains(clean, junk) || strings.Contains(plain, junk) {
+			t.Fatalf("hidden element leaked %q: %q", junk, clean)
+		}
+	}
+	if !strings.Contains(clean, "Synligt indhold") {
+		t.Fatalf("visible content lost: %q", clean)
+	}
+}
+
+func TestReaderModeV2_JunkUnicodeStripped(t *testing.T) {
+	// U+034F combining grapheme joiner + U+00AD soft hyphen — klassisk preheader-padding
+	in := "<p>Intro͏ ͏ ͏ ͏ ­ ­ ­ tekst</p>"
+	clean, _ := toReaderModeHTML(in, readerModeOptions{MinImgPx: 32})
+	if strings.Contains(clean, "͏") || strings.Contains(clean, "­") {
+		t.Fatalf("junk unicode survived: %q", clean)
+	}
+	if !strings.Contains(clean, "Intro") || !strings.Contains(clean, "tekst") {
+		t.Fatalf("content lost: %q", clean)
+	}
+}
+
+func TestReaderModeV2_DoubleEncodedEntities(t *testing.T) {
+	// Kilden var dobbelt-encodet (&amp;quot;) — parseren dekoder én gang, vi skal tage anden runde
+	in := `<p>&amp;quot;Daniel&amp;quot; &amp;lt;d@x.com&amp;gt;</p>`
+	_, plain := toReaderModeHTML(in, readerModeOptions{MinImgPx: 32})
+	if strings.Contains(plain, "&quot;") || strings.Contains(plain, "&lt;") {
+		t.Fatalf("entities not decoded: %q", plain)
+	}
+	if !strings.Contains(plain, `"Daniel"`) {
+		t.Fatalf("expected decoded quotes: %q", plain)
+	}
+}
+
+func TestReaderModeV2_CollapseNoise(t *testing.T) {
+	in := `<p>a</p><br><br><br><br><p></p><div></div><p>________________________</p><p>b</p>`
+	clean, _ := toReaderModeHTML(in, readerModeOptions{MinImgPx: 32})
+	if strings.Count(clean, "<br") > 2 {
+		t.Fatalf("br run not collapsed: %q", clean)
+	}
+	if strings.Contains(clean, "________") {
+		t.Fatalf("underscore separator survived: %q", clean)
+	}
+	if !strings.Contains(clean, "<hr") {
+		t.Fatalf("expected hr replacement: %q", clean)
+	}
+}
+
+func TestReaderModeV2_HeadingsDemoted(t *testing.T) {
+	in := `<h1>Stor</h1><h2>Mellem</h2><h3>Fin</h3>`
+	clean, _ := toReaderModeHTML(in, readerModeOptions{MinImgPx: 32})
+	if strings.Contains(clean, "<h1") || strings.Contains(clean, "<h2") {
+		t.Fatalf("h1/h2 not demoted: %q", clean)
+	}
+	if !strings.Contains(clean, "<h3>Stor</h3>") || !strings.Contains(clean, "<h4>Mellem</h4>") || !strings.Contains(clean, "<h3>Fin</h3>") {
+		t.Fatalf("demotion wrong: %q", clean)
+	}
+}
