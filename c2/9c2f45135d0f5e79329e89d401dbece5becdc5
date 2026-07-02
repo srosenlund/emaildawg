@@ -1,0 +1,19 @@
+docs/superpowers/plans/2026-07-02-reader-mode-v2.md
+  s_ddeace781fc7d0::t_825a1f55807ba2 1-772
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.9",
+  "base_commit_sha": "c29c2f45135d0f5e79329e89d401dbece5becdc5",
+  "prompts": {},
+  "sessions": {
+    "s_ddeace781fc7d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1a35a2f9-f475-415b-b3b4-dc3ade490a3a",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
