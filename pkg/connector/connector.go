@@ -64,11 +64,18 @@ var (
 )
 
 // mergeProcessingConfig preserves YAML-parsed Processing values, defaulting
-// only when the whole section is absent (zero) — Init used to clobber the
-// section with defaults, which made reader_mode_extract: false a no-op.
+// only what the config file demonstrably lacks — Init used to clobber the
+// whole section with defaults, which made reader_mode_extract: false a no-op.
+// Bool-ambiguitet: config-filer fra før reader-nøglerne fandtes parser dem som
+// false; når HELE reader-blokken er zero, er nøglerne fraværende → defaults.
+// Eksplicit opt-out: sæt reader_mode: false SAMMEN med reader_mode_min_img_px.
 func mergeProcessingConfig(parsed ProcessingConfig) ProcessingConfig {
 	if parsed == (ProcessingConfig{}) {
 		return defaultProcessingConfig()
+	}
+	if !parsed.ReaderMode && parsed.ReaderModeMinImgPx == 0 && !parsed.ReaderModeExtract {
+		parsed.ReaderMode = true
+		parsed.ReaderModeExtract = true
 	}
 	if parsed.ReaderModeMinImgPx <= 0 {
 		parsed.ReaderModeMinImgPx = email.DefaultReaderModeMinImgPx
