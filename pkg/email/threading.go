@@ -177,6 +177,9 @@ type ParsedEmail struct {
 	TextContent string
 	HTMLContent string
 	Attachments []*EmailAttachment
+	// IsBulk marks newsletters/marketing (List-Unsubscribe or Precedence:
+	// bulk/list) — gates reader-mode content extraction.
+	IsBulk bool
 }
 
 // isForwardedMessage checks if an email is a forward based on subject and content

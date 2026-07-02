@@ -9,7 +9,7 @@ func TestProcessor_finalizeHTML_ReaderModeOn(t *testing.T) {
 	p := &Processor{ReaderMode: true, ReaderModeMinImgPx: 32}
 	in := `<table role="presentation"><tr><td><p>Hi there</p></td></tr></table>` +
 		`<img src="mxc://h/track" width="1" height="1"><script>x()</script>`
-	formatted, plain := p.finalizeHTML(in)
+	formatted, plain := p.finalizeHTML(in, false)
 	if strings.Contains(formatted, "<table") {
 		t.Fatalf("layout table survived: %q", formatted)
 	}
@@ -29,7 +29,7 @@ func TestProcessor_finalizeHTML_ReaderModeOn(t *testing.T) {
 
 func TestProcessor_finalizeHTML_ReaderModeOff(t *testing.T) {
 	p := &Processor{ReaderMode: false}
-	formatted, plain := p.finalizeHTML(`<p>raw &amp; co</p>`)
+	formatted, plain := p.finalizeHTML(`<p>raw &amp; co</p>`, false)
 	if plain != "" {
 		t.Fatalf("legacy path should not set plain, got %q", plain)
 	}

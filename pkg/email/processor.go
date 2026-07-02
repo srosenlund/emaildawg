@@ -68,6 +68,8 @@ type Processor struct {
 	GzipLargeBodies bool
 	// ReaderMode enables reader-mode HTML sanitisation before posting to Matrix.
 	ReaderMode bool
+	// ReaderModeExtract enables bulk-mail content extraction (layer 2).
+	ReaderModeExtract bool
 	// ReaderModeMinImgPx is the dimension threshold below which inline images are
 	// treated as tracking pixels / spacers and dropped by reader-mode processing.
 	ReaderModeMinImgPx int
@@ -274,6 +276,8 @@ func (p *Processor) parseIMAPFetchData(fetchData *imapclient.FetchMessageData) (
 	if len(references) > 0 {
 		parsedEmail.References = references
 	}
+
+	parsedEmail.IsBulk = p.extractIsBulkFromHeaders(buf)
 
 	return parsedEmail, nil
 }
@@ -647,6 +651,35 @@ func (p *Processor) extractReferencesFromHeaders(buf *imapclient.FetchMessageBuf
 		}
 	}
 	return nil
+}
+
+// isBulkHeaders reports whether headers mark the mail as bulk (newsletter /
+// marketing): List-Unsubscribe present, or Precedence: bulk/list.
+func isBulkHeaders(h textproto.MIMEHeader) bool {
+	if h.Get("List-Unsubscribe") != "" {
+		return true
+	}
+	switch strings.ToLower(strings.TrimSpace(h.Get("Precedence"))) {
+	case "bulk", "list":
+		return true
+	}
+	return false
+}
+
+// extractIsBulkFromHeaders scans header body-sections for bulk markers.
+func (p *Processor) extractIsBulkFromHeaders(buf *imapclient.FetchMessageBuffer) bool {
+	for _, section := range buf.BodySection {
+		if section.Section.Specifier == imap.PartSpecifierHeader {
+			headers, err := textproto.NewReader(bufio.NewReader(bytes.NewReader(section.Bytes))).ReadMIMEHeader()
+			if err != nil {
+				continue
+			}
+			if isBulkHeaders(headers) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // decodeBody wraps the reader according to Content-Transfer-Encoding
@@ -1036,7 +1069,7 @@ func (e *EmailMatrixEvent) ConvertMessage(ctx context.Context, portal *bridgev2.
 	// Add HTML formatting if available
 	if origHTML != "" && origHTML != e.emailMessage.TextContent {
 		content.Format = event.FormatHTML
-		formatted, plain := e.processor.finalizeHTML(origHTML)
+		formatted, plain := e.processor.finalizeHTML(origHTML, e.emailMessage.IsBulk)
 		content.FormattedBody = formatted
 		// In reader mode, prefer the cleaned plaintext as the body fallback.
 		if plain != "" {
@@ -1764,13 +1797,16 @@ func filterInvisibleUnicode(s string) string {
 
 // finalizeHTML produces the Matrix formatted body (and, in reader mode, a
 // cleaned plaintext fallback) from the post-MXC email HTML.
-func (p *Processor) finalizeHTML(origHTML string) (formatted, plain string) {
+func (p *Processor) finalizeHTML(origHTML string, isBulk bool) (formatted, plain string) {
 	if p.ReaderMode {
 		minPx := p.ReaderModeMinImgPx
 		if minPx <= 0 {
 			minPx = DefaultReaderModeMinImgPx
 		}
-		return toReaderModeHTML(origHTML, readerModeOptions{MinImgPx: minPx})
+		return toReaderModeHTML(origHTML, readerModeOptions{
+			MinImgPx: minPx,
+			Extract:  isBulk && p.ReaderModeExtract,
+		})
 	}
 	// Legacy path: decode entities + strip invisible Unicode, no plaintext rewrite.
 	formatted = filterInvisibleUnicode(html.UnescapeString(origHTML))

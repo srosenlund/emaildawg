@@ -71,6 +71,7 @@ func defaultProcessingConfig() ProcessingConfig {
 		GzipLargeBodies:    true,
 		ReaderMode:         true,
 		ReaderModeMinImgPx: email.DefaultReaderModeMinImgPx,
+		ReaderModeExtract:  true,
 	}
 }
 
@@ -208,6 +209,7 @@ func (ec *EmailConnector) Init(bridge *bridgev2.Bridge) {
 	ec.Processor.GzipLargeBodies = ec.Config.Processing.GzipLargeBodies
 	ec.Processor.ReaderMode = ec.Config.Processing.ReaderMode
 	ec.Processor.ReaderModeMinImgPx = ec.Config.Processing.ReaderModeMinImgPx
+	ec.Processor.ReaderModeExtract = ec.Config.Processing.ReaderModeExtract
 	if ec.Processor.ReaderModeMinImgPx <= 0 {
 		ec.Processor.ReaderModeMinImgPx = email.DefaultReaderModeMinImgPx
 	}
