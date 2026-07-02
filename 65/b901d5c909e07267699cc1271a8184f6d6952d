@@ -1,0 +1,24 @@
+pkg/email/readermode.go
+  s_ddeace781fc7d0::t_33c5950073ba2f 5
+  s_ddeace781fc7d0::t_1c89e199bb583c 50-51
+  s_ddeace781fc7d0::t_ab4719059a52da 74,77-83
+  s_ddeace781fc7d0::t_583dcb99314c41 250-439
+pkg/email/readermode_test.go
+  s_ddeace781fc7d0::t_a2dfd4c28c5a5b 146-211
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.9",
+  "base_commit_sha": "65b901d5c909e07267699cc1271a8184f6d6952d",
+  "prompts": {},
+  "sessions": {
+    "s_ddeace781fc7d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1a35a2f9-f475-415b-b3b4-dc3ade490a3a",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
