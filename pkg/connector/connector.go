@@ -693,8 +693,9 @@ func (ec *EmailConnector) GetDBMetaTypes() database.MetaTypes {
 }
 
 func (ec *EmailConnector) GetBridgeInfoVersion() (int, int) {
-
-	return 1, 1 // Version 1.1
+	// Info-version bumpet til 2: NetworkIcon skiftet til Outlook-logo — trigger
+	// resend af bridge-info til alle eksisterende portaler ved opstart.
+	return 2, 1
 }
 
 func (ec *EmailConnector) GetLoginFlows() []bridgev2.LoginFlow {
