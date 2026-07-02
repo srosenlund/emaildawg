@@ -49,3 +49,9 @@ email_processing:
     max_upload_bytes: 26214400
     # Attempt gzip for oversized original HTML/text bodies before attaching
     gzip_large_bodies: true
+    # Reader-mode HTML sanitisation (strip clutter, tracking pixels, hidden preheaders)
+    reader_mode: true
+    # Inline images at or below this pixel dimension are dropped as tracking pixels
+    reader_mode_min_img_px: 32
+    # Prune footers/boilerplate in bulk mails (List-Unsubscribe) — layer 2 of reader mode
+    reader_mode_extract: true

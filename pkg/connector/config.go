@@ -78,6 +78,8 @@ type ProcessingConfig struct {
 	ReaderMode bool `yaml:"reader_mode"`
 	// ReaderModeMinImgPx: inline images at or below this pixel dimension are dropped as tracking pixels.
 	ReaderModeMinImgPx int `yaml:"reader_mode_min_img_px"`
+	// ReaderModeExtract: prune footers/boilerplate in bulk mails (List-Unsubscribe). Layer 2 of reader mode.
+	ReaderModeExtract bool `yaml:"reader_mode_extract"`
 }
 
 func upgradeConfig(helper up.Helper) {
@@ -104,6 +106,9 @@ func upgradeConfig(helper up.Helper) {
 	// Email processing configuration
 	helper.Copy(up.Int, "email_processing", "max_upload_bytes")
 	helper.Copy(up.Bool, "email_processing", "gzip_large_bodies")
+	helper.Copy(up.Bool, "email_processing", "reader_mode")
+	helper.Copy(up.Int, "email_processing", "reader_mode_min_img_px")
+	helper.Copy(up.Bool, "email_processing", "reader_mode_extract")
 
 	// Logging configuration
 	helper.Copy(up.Bool, "logging", "sanitized")

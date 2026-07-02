@@ -63,6 +63,19 @@ var (
 	_ bridgev2.RedactionHandlingNetworkAPI   = (*EmailClient)(nil)
 )
 
+// mergeProcessingConfig preserves YAML-parsed Processing values, defaulting
+// only when the whole section is absent (zero) — Init used to clobber the
+// section with defaults, which made reader_mode_extract: false a no-op.
+func mergeProcessingConfig(parsed ProcessingConfig) ProcessingConfig {
+	if parsed == (ProcessingConfig{}) {
+		return defaultProcessingConfig()
+	}
+	if parsed.ReaderModeMinImgPx <= 0 {
+		parsed.ReaderModeMinImgPx = email.DefaultReaderModeMinImgPx
+	}
+	return parsed
+}
+
 // defaultProcessingConfig is the single source of ProcessingConfig defaults,
 // shared by NewEmailConnector (tests) and Init (production) so they cannot drift.
 func defaultProcessingConfig() ProcessingConfig {
@@ -71,6 +84,7 @@ func defaultProcessingConfig() ProcessingConfig {
 		GzipLargeBodies:    true,
 		ReaderMode:         true,
 		ReaderModeMinImgPx: email.DefaultReaderModeMinImgPx,
+		ReaderModeExtract:  true,
 	}
 }
 
@@ -121,7 +135,9 @@ func (ec *EmailConnector) Init(bridge *bridgev2.Bridge) {
 			Sanitized:       true,
 			PseudonymSecret: "",
 		},
-		Processing: defaultProcessingConfig(),
+		// Preserve parsed Processing (reader_mode_extract escape hatch etc.);
+		// fall back to defaults only when nothing was parsed.
+		Processing: mergeProcessingConfig(ec.Config.Processing),
 	}
 
 	// Allow environment overrides for verbose logging
@@ -208,6 +224,7 @@ func (ec *EmailConnector) Init(bridge *bridgev2.Bridge) {
 	ec.Processor.GzipLargeBodies = ec.Config.Processing.GzipLargeBodies
 	ec.Processor.ReaderMode = ec.Config.Processing.ReaderMode
 	ec.Processor.ReaderModeMinImgPx = ec.Config.Processing.ReaderModeMinImgPx
+	ec.Processor.ReaderModeExtract = ec.Config.Processing.ReaderModeExtract
 	if ec.Processor.ReaderModeMinImgPx <= 0 {
 		ec.Processor.ReaderModeMinImgPx = email.DefaultReaderModeMinImgPx
 	}

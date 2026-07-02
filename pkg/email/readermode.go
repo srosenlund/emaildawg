@@ -2,6 +2,7 @@ package email
 
 import (
 	"bytes"
+	htmlpkg "html"
 	"regexp"
 	"strconv"
 	"strings"
@@ -46,6 +47,8 @@ func sanitizeMatrixHTML(s string) string {
 
 type readerModeOptions struct {
 	MinImgPx int
+	// Extract enables layer-2 content extraction (bulk mails only).
+	Extract bool
 }
 
 // toReaderModeHTML parses post-MXC email HTML, linearises newsletter layout
@@ -68,8 +71,16 @@ func toReaderModeHTML(htmlStr string, opts readerModeOptions) (cleanHTML, plainT
 		container.AppendChild(n)
 	}
 
+	dropHiddenElements(container)
 	dropTrackingImages(container, opts.MinImgPx)
 	unwrapLayoutTables(container)
+	if opts.Extract {
+		pruneBulkContent(container)
+	}
+	decodeStableEntities(container)
+	stripJunkUnicode(container)
+	collapseNoise(container)
+	demoteHeadings(container)
 
 	var buf bytes.Buffer
 	for c := container.FirstChild; c != nil; c = c.NextSibling {
@@ -235,4 +246,224 @@ func linearizeTable(table *html.Node) {
 		parent.InsertBefore(n, table)
 	}
 	parent.RemoveChild(table)
+}
+
+// hiddenStyleRe matches inline styles that hide content (preheaders, spacers).
+// Left-boundary anchors prevent matching backface-visibility/fill-opacity;
+// trailing guards prevent max-height:0.5em. mso-hide:all is deliberately NOT
+// here — it hides only in Outlook, every other client shows the content.
+var hiddenStyleRe = regexp.MustCompile(`(?i)(?:^|[;"'\s])(?:display\s*:\s*none|visibility\s*:\s*hidden|opacity\s*:\s*0(?:\.0+)?\s*(?:;|$)|max-height\s*:\s*0(?:px)?\s*(?:;|$))`)
+
+// fontSizeHiddenRe: font-size:0/1px preheader trick. Only safe to treat as
+// hidden on LEAF elements — newsletters put font-size:0 on wrappers whose
+// children reset their own size (fluid-hybrid whitespace hack).
+var fontSizeHiddenRe = regexp.MustCompile(`(?i)(?:^|[;"'\s])font-size\s*:\s*[01](?:px)?\s*(?:;|$)`)
+
+// dropHiddenElements removes any element whose inline style hides it.
+// Generalises the img-only hidden check to all elements (hidden preheader text).
+func dropHiddenElements(root *html.Node) {
+	var toRemove []*html.Node
+	var walk func(n *html.Node)
+	walk = func(n *html.Node) {
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			if c.Type == html.ElementNode {
+				for _, a := range c.Attr {
+					if !strings.EqualFold(a.Key, "style") {
+						continue
+					}
+					if hiddenStyleRe.MatchString(a.Val) ||
+						(fontSizeHiddenRe.MatchString(a.Val) && !hasElementChild(c)) {
+						toRemove = append(toRemove, c)
+					}
+					break
+				}
+			}
+			walk(c)
+		}
+	}
+	walk(root)
+	for _, n := range toRemove {
+		if n.Parent != nil {
+			n.Parent.RemoveChild(n)
+		}
+	}
+}
+
+func hasElementChild(n *html.Node) bool {
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		if c.Type == html.ElementNode {
+			return true
+		}
+	}
+	return false
+}
+
+// isJunkRune reports preheader-padding characters. Deliberately a conservative
+// set — NOT all of Cf/Mn, which would damage legitimate combining marks in
+// non-Latin text: U+034F, U+00AD, U+200B–U+200F, U+2060, U+FEFF.
+func isJunkRune(r rune) bool {
+	switch {
+	case r == 0x034F, r == 0x00AD, r == 0x2060, r == 0xFEFF:
+		return true
+	case r >= 0x200B && r <= 0x200F:
+		return true
+	}
+	return false
+}
+
+// nbspRunRe: only very long nbsp/space runs are preheader padding —
+// short runs are deliberate alignment/indentation and must survive.
+var nbspRunRe = regexp.MustCompile(`[\x{00A0} \t]{30,}`)
+
+// stripJunkUnicode removes preheader-padding runes from text nodes and
+// collapses long nbsp/space runs. Skips pre/code content.
+func stripJunkUnicode(root *html.Node) {
+	walkTextNodes(root, func(n *html.Node) {
+		s := strings.Map(func(r rune) rune {
+			if isJunkRune(r) {
+				return -1
+			}
+			return r
+		}, n.Data)
+		n.Data = nbspRunRe.ReplaceAllString(s, " ")
+	})
+}
+
+var entityRe = regexp.MustCompile(`&(?:[a-zA-Z]{2,10}|#\d{1,7});`)
+
+// decodeStableEntities runs a second entity-decode on text nodes that still
+// contain entity patterns after parsing — i.e. the source was double-encoded
+// (common in forwarded Gmail HTML).
+func decodeStableEntities(root *html.Node) {
+	walkTextNodes(root, func(n *html.Node) {
+		if entityRe.MatchString(n.Data) {
+			// Dekod KUN de matchede tokens (kræver semikolon) — en hel-streng
+			// UnescapeString ville også dekode legacy-entities uden semikolon
+			// (&copy, &reg) og korrumpere URL-query-params.
+			n.Data = entityRe.ReplaceAllStringFunc(n.Data, htmlpkg.UnescapeString)
+		}
+	})
+}
+
+// walkTextNodes calls fn on every text node not inside pre/code.
+func walkTextNodes(root *html.Node, fn func(*html.Node)) {
+	var walk func(n *html.Node, inPre bool)
+	walk = func(n *html.Node, inPre bool) {
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			pre := inPre || (c.Type == html.ElementNode && (c.DataAtom == atom.Pre || c.DataAtom == atom.Code))
+			if c.Type == html.TextNode && !inPre {
+				fn(c)
+			}
+			walk(c, pre)
+		}
+	}
+	walk(root, false)
+}
+
+var separatorRunRe = regexp.MustCompile(`[_\-=]{5,}`)
+
+// collapseNoise trims visual noise: >2 consecutive <br>, empty p/div chains,
+// and text-only separator runs (____) which become a single <hr>.
+func collapseNoise(root *html.Node) {
+	// br-runs: fjern br nr. 3+ i en ubrudt (whitespace-tolerant) kæde
+	var brRemove []*html.Node
+	var walkBr func(n *html.Node)
+	walkBr = func(n *html.Node) {
+		run := 0
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			switch {
+			case c.Type == html.ElementNode && c.DataAtom == atom.Br:
+				run++
+				if run > 2 {
+					brRemove = append(brRemove, c)
+				}
+			case c.Type == html.TextNode && strings.TrimSpace(c.Data) == "":
+				// whitespace bryder ikke kæden
+			default:
+				run = 0
+			}
+			walkBr(c)
+		}
+	}
+	walkBr(root)
+	for _, n := range brRemove {
+		if n.Parent != nil {
+			n.Parent.RemoveChild(n)
+		}
+	}
+
+	// separator-runs → <hr> KUN når tekst-noden ikke er andet end separatoren.
+	// Runs inde i blandet tekst (PGP-armor, "-----Original Message-----",
+	// blanket-linjer "Navn: ____") skal bevares urørt.
+	walkTextNodes(root, func(n *html.Node) {
+		trimmed := strings.TrimSpace(n.Data)
+		if trimmed != "" && separatorRunRe.ReplaceAllString(trimmed, "") == "" {
+			n.Data = ""
+			if n.Parent != nil {
+				hr := &html.Node{Type: html.ElementNode, Data: "hr", DataAtom: atom.Hr}
+				n.Parent.InsertBefore(hr, n)
+			}
+		}
+	})
+
+	// tomme p/div (ingen tekst, ingen img/a/hr/br) fjernes
+	var emptyRemove []*html.Node
+	var walkEmpty func(n *html.Node)
+	walkEmpty = func(n *html.Node) {
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			walkEmpty(c)
+			if c.Type == html.ElementNode && (c.DataAtom == atom.P || c.DataAtom == atom.Div) {
+				if strings.TrimSpace(textOf(c)) == "" && !hasDescendant(c, atom.Img) &&
+					!hasDescendant(c, atom.A) && !hasDescendant(c, atom.Hr) && !hasDescendant(c, atom.Br) {
+					emptyRemove = append(emptyRemove, c)
+				}
+			}
+		}
+	}
+	walkEmpty(root)
+	for _, n := range emptyRemove {
+		if n.Parent != nil {
+			n.Parent.RemoveChild(n)
+		}
+	}
+}
+
+// textOf returns the concatenated text content of a node.
+func textOf(n *html.Node) string {
+	var b strings.Builder
+	var walk func(x *html.Node)
+	walk = func(x *html.Node) {
+		for c := x.FirstChild; c != nil; c = c.NextSibling {
+			if c.Type == html.TextNode {
+				b.WriteString(c.Data)
+			}
+			walk(c)
+		}
+	}
+	walk(n)
+	return b.String()
+}
+
+// demoteHeadings maps h1→h3 and h2→h4 so newsletter headlines don't scream in
+// Matrix clients. h3–h6 render at sane sizes and are left alone.
+func demoteHeadings(root *html.Node) {
+	var walk func(n *html.Node)
+	walk = func(n *html.Node) {
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			if c.Type == html.ElementNode {
+				switch c.DataAtom {
+				case atom.H1:
+					c.Data, c.DataAtom = "h3", atom.H3
+				case atom.H2:
+					c.Data, c.DataAtom = "h4", atom.H4
+				case atom.H3:
+					c.Data, c.DataAtom = "h5", atom.H5
+				case atom.H4, atom.H5:
+					c.Data, c.DataAtom = "h6", atom.H6
+				}
+			}
+			walk(c)
+		}
+	}
+	walk(root)
 }
