@@ -271,3 +271,38 @@ func TestReaderModeV2_ShortNbspAlignmentPreserved(t *testing.T) {
 		t.Fatalf("short nbsp alignment collapsed: %q", clean)
 	}
 }
+
+func TestReaderModeV2_UnresolvableImagesDropped(t *testing.T) {
+	// cid:/http-billeder kan ikke renderes af Matrix-klienter — de bliver til
+	// knækkede placeholders med alt-tekst (signatur-logoer). Drop dem helt,
+	// inkl. links der derefter står tomme. mxc-billeder skal bevares.
+	in := `<p>Tekst før</p>` +
+		`<img src="cid:logo123" alt="RIT's logo">` +
+		`<a href="https://x.com/nyhedsbrev"><img src="cid:btn" alt="Tilmeld Nyhedsbrev"></a>` +
+		`<img src="https://x.com/remote.png" alt="Gazelle logo">` +
+		`<img src="mxc://local.beeper.com/abc" alt="vedhæftet billede">` +
+		`<p>Tekst efter</p>`
+	clean, plain := toReaderModeHTML(in, readerModeOptions{MinImgPx: 32})
+	for _, junk := range []string{"RIT", "Tilmeld", "Gazelle"} {
+		if strings.Contains(clean, junk) || strings.Contains(plain, junk) {
+			t.Fatalf("broken image placeholder survived %q: %q", junk, clean)
+		}
+	}
+	if !strings.Contains(clean, "mxc://local.beeper.com/abc") {
+		t.Fatalf("mxc image lost: %q", clean)
+	}
+	if !strings.Contains(clean, "Tekst før") || !strings.Contains(clean, "Tekst efter") {
+		t.Fatalf("content lost: %q", clean)
+	}
+}
+
+func TestReaderModeV2_AnchorWithTextKeptAfterImageDrop(t *testing.T) {
+	in := `<a href="https://x.com"><img src="cid:i" alt="ikon"> Læs mere her</a>`
+	clean, _ := toReaderModeHTML(in, readerModeOptions{MinImgPx: 32})
+	if !strings.Contains(clean, "Læs mere her") {
+		t.Fatalf("link text lost: %q", clean)
+	}
+	if strings.Contains(clean, "<img") {
+		t.Fatalf("cid image survived: %q", clean)
+	}
+}

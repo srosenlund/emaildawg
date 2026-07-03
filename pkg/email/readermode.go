@@ -73,6 +73,7 @@ func toReaderModeHTML(htmlStr string, opts readerModeOptions) (cleanHTML, plainT
 
 	dropHiddenElements(container)
 	dropTrackingImages(container, opts.MinImgPx)
+	dropUnresolvableImages(container)
 	unwrapLayoutTables(container)
 	if opts.Extract {
 		pruneBulkContent(container)
@@ -466,4 +467,57 @@ func demoteHeadings(root *html.Node) {
 		}
 	}
 	walk(root)
+}
+
+
+// dropUnresolvableImages removes <img> elements whose src is not an mxc:// URI.
+// After MXC rewriting (IMAP path) or on the Graph path (no inline-image upload),
+// cid:/http leftovers cannot be rendered by Matrix clients and show as broken
+// placeholders with alt text (signature logos, tracking banners). Anchors left
+// without any visible content are removed with them.
+func dropUnresolvableImages(root *html.Node) {
+	var imgs []*html.Node
+	var walk func(n *html.Node)
+	walk = func(n *html.Node) {
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			if c.Type == html.ElementNode && c.DataAtom == atom.Img {
+				src := ""
+				for _, a := range c.Attr {
+					if strings.EqualFold(a.Key, "src") {
+						src = strings.TrimSpace(a.Val)
+						break
+					}
+				}
+				if !strings.HasPrefix(strings.ToLower(src), "mxc://") {
+					imgs = append(imgs, c)
+				}
+			}
+			walk(c)
+		}
+	}
+	walk(root)
+	for _, n := range imgs {
+		if n.Parent != nil {
+			n.Parent.RemoveChild(n)
+		}
+	}
+
+	// anchors der nu er tomme (intet tekst-indhold, ingen billeder) fjernes
+	var emptyAnchors []*html.Node
+	var walkA func(n *html.Node)
+	walkA = func(n *html.Node) {
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			walkA(c)
+			if c.Type == html.ElementNode && c.DataAtom == atom.A &&
+				strings.TrimSpace(textOf(c)) == "" && !hasDescendant(c, atom.Img) {
+				emptyAnchors = append(emptyAnchors, c)
+			}
+		}
+	}
+	walkA(root)
+	for _, n := range emptyAnchors {
+		if n.Parent != nil {
+			n.Parent.RemoveChild(n)
+		}
+	}
 }
