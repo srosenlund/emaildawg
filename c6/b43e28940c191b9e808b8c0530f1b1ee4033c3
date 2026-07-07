@@ -1,0 +1,28 @@
+pkg/email/extract.go
+  s_73517ca36b20e9::t_ba7e050a13f203 26-32,41,43-44,46-48,51,53-55,57,61-62,68-70,86,88-91,99,111,121-123,132,148-150
+  s_73517ca36b20e9::t_e6f83873020ec7 33-40,42,45,49-50,52,56,58-60,63-66,77,87
+  s_73517ca36b20e9::t_ebf057a065712a 78
+pkg/email/extract_test.go
+  s_73517ca36b20e9::t_4c3529781633c5 51-74
+  s_73517ca36b20e9::t_7d46bd829e5508 82-147
+pkg/email/readermode.go
+  s_73517ca36b20e9::t_0420ff9cb5fbf9 99
+  s_73517ca36b20e9::t_63c95c0d0d7376 96-98,100-126
+  s_73517ca36b20e9::t_9985f9b9275be8 74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "c6b43e28940c191b9e808b8c0530f1b1ee4033c3",
+  "prompts": {},
+  "sessions": {
+    "s_73517ca36b20e9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b71fbc63-5356-46c1-9f10-ce9a5a5508d2",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
