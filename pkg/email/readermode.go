@@ -71,6 +71,7 @@ func toReaderModeHTML(htmlStr string, opts readerModeOptions) (cleanHTML, plainT
 		container.AppendChild(n)
 	}
 
+	dropNonRenderedElements(container)
 	dropHiddenElements(container)
 	dropTrackingImages(container, opts.MinImgPx)
 	dropUnresolvableImages(container)
@@ -90,6 +91,37 @@ func toReaderModeHTML(htmlStr string, opts readerModeOptions) (cleanHTML, plainT
 	cleanHTML = sanitizeMatrixHTML(buf.String())
 	plainText = simpleHTMLToText(cleanHTML)
 	return cleanHTML, plainText
+}
+
+// nonRenderedAtoms: elementer hvis indhold aldrig renderes i klienten
+// (sanitizeren stripper dem alligevel til sidst). De fjernes fra træet som
+// første pass, så al efterfølgende tekst-måling (pruner-scoring, retention-
+// guard, empty-block-tjek) kun ser tekst der faktisk vises.
+var nonRenderedAtoms = map[atom.Atom]bool{
+	atom.Style: true, atom.Script: true, atom.Head: true, atom.Meta: true,
+	atom.Link: true, atom.Title: true, atom.Noscript: true, atom.Base: true,
+}
+
+// dropNonRenderedElements removes style/script/head/meta/… subtrees so their
+// text (typically CSS) never counts as content anywhere in the pipeline.
+func dropNonRenderedElements(root *html.Node) {
+	var toRemove []*html.Node
+	var walk func(n *html.Node)
+	walk = func(n *html.Node) {
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			if c.Type == html.ElementNode && nonRenderedAtoms[c.DataAtom] {
+				toRemove = append(toRemove, c)
+				continue
+			}
+			walk(c)
+		}
+	}
+	walk(root)
+	for _, n := range toRemove {
+		if n.Parent != nil {
+			n.Parent.RemoveChild(n)
+		}
+	}
 }
 
 var styleDimRe = regexp.MustCompile(`(?i)(width|height)\s*:\s*(\d+)\s*px`)
