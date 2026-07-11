@@ -1,0 +1,19 @@
+docker-compose.nipogi.yml
+  s_d9a3da96ef3019::t_6085744b4dc65f 1-14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "17f47a91e945c3b1150a5bc7fdf5b199d6c9871a",
+  "prompts": {},
+  "sessions": {
+    "s_d9a3da96ef3019": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "917c23bd-1554-40e2-a1ae-d7c99d038020",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
