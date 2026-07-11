@@ -1,0 +1,14 @@
+# NiPoGi agents-LXC deployment (Komodo-stack "emaildawg").
+# Bygges lokalt fra Dockerfile.sliplane (run_build=true i stacken);
+# app'en henter sin config via DOPPLER_TOKEN (renderes fra BWS).
+services:
+  emaildawg:
+    image: emaildawg:local
+    build:
+      context: .
+      dockerfile: Dockerfile.sliplane
+    container_name: emaildawg
+    restart: unless-stopped
+    volumes:
+      - /opt/emaildawg/data:/home/nonroot/app/data
+    env_file: /opt/emaildawg/.env
