@@ -9,6 +9,12 @@ services:
       dockerfile: Dockerfile.sliplane
     container_name: emaildawg
     restart: unless-stopped
+    ports:
+      # Graph-webhook-endpoint. Bundet til host-IP (LAN-only), ikke 0.0.0.0 —
+      # Caddy paa nipogi-infra reverse-proxyer det offentligt via
+      # emaildawg.stefanrosenlund.dk, saa Microsoft Graph kan naa
+      # validerings-/notifikations-URL'en. Samme moenster som beeperbox.
+      - "192.168.1.98:29319:29319"
     volumes:
       - /opt/emaildawg/data:/home/nonroot/app/data
     env_file: /opt/emaildawg/.env
