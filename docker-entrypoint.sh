@@ -1,12 +1,24 @@
 #!/bin/sh
 set -e
 
-# Secrets via Doppler: when a Doppler service token is present, re-exec this
-# entrypoint under `doppler run` so EMAILDAWG_CONFIG_B64 + EMAILDAWG_PASSPHRASE
-# come from Doppler (sliplane-services/prd_emaildawg) instead of raw Sliplane env
-# vars. Backward compatible: with DOPPLER_TOKEN unset, the env-var path is used.
-if [ -n "${DOPPLER_TOKEN:-}" ] && [ -z "${DOPPLER_INJECTED:-}" ]; then
-  export DOPPLER_INJECTED=1
+# --- Secrets injection ---------------------------------------------------------
+# Preference order: BWS (homelab standard) -> Doppler (fallback) -> raw env vars.
+# Whichever runtime is active re-execs this entrypoint with EMAILDAWG_CONFIG_B64 +
+# EMAILDAWG_PASSPHRASE injected as env vars; a guard var prevents an infinite
+# re-exec loop.
+
+# Bitwarden Secrets Manager: when a machine-account token is present, re-exec under
+# `bws run` so secrets come from the Homelab BWS project. This is the homelab
+# standard and takes precedence over Doppler.
+if [ -n "${BWS_ACCESS_TOKEN:-}" ] && [ -z "${SECRETS_INJECTED:-}" ]; then
+  export SECRETS_INJECTED=1
+  exec bws run -- "$0" "$@"
+fi
+
+# Doppler (legacy fallback): kept so the migration can flip via env without a
+# rebuild. Only used when BWS_ACCESS_TOKEN is unset.
+if [ -n "${DOPPLER_TOKEN:-}" ] && [ -z "${SECRETS_INJECTED:-}" ]; then
+  export SECRETS_INJECTED=1
   exec doppler run --silent -- "$0" "$@"
 fi
 

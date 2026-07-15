@@ -27,8 +27,21 @@ RUN apt-get update -y \
     && echo "deb [signed-by=/usr/share/keyrings/doppler-archive-keyring.gpg] https://packages.doppler.com/public/cli/deb/debian any-version main" \
        > /etc/apt/sources.list.d/doppler-cli.list \
     && apt-get update -y \
-    && apt-get install -y --no-install-recommends doppler \
+    && apt-get install -y --no-install-recommends doppler unzip \
     && rm -rf /var/lib/apt/lists/*
+
+# Bitwarden Secrets Manager CLI (bws). Homelab-standard for secrets — entrypoint
+# re-execs under `bws run` when BWS_ACCESS_TOKEN is set (preferred over Doppler).
+# Pinned to 2.0.0 to match the rest of the estate. Doppler kept as fallback so the
+# migration can flip via env without a rebuild.
+RUN curl -sLf --retry 3 --tlsv1.2 --proto "=https" \
+       -o /tmp/bws.zip \
+       'https://github.com/bitwarden/sdk-sm/releases/download/bws-v2.0.0/bws-x86_64-unknown-linux-gnu-2.0.0.zip' \
+    && unzip -o /tmp/bws.zip -d /usr/local/bin \
+    && chmod +x /usr/local/bin/bws \
+    && rm -f /tmp/bws.zip \
+    && bws --version
+
 RUN useradd -m -u 1000 nonroot
 
 COPY --from=builder /build/emaildawg /usr/bin/emaildawg
