@@ -9,6 +9,9 @@ services:
       dockerfile: Dockerfile.sliplane
     container_name: beeper-email
     restart: unless-stopped
+    labels:
+      org.opencontainers.image.source: "https://github.com/srosenlund/emaildawg"
+      org.opencontainers.image.description: "emaildawg — Outlook/Graph-mail-bro til Beeper/Matrix"
     ports:
       # Graph-webhook-endpoint. Bundet til host-IP (LAN-only), ikke 0.0.0.0 —
       # Caddy paa nipogi-infra reverse-proxyer det offentligt via
