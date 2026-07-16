@@ -7,7 +7,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.sliplane
-    container_name: emaildawg
+    container_name: beeper-email
     restart: unless-stopped
     ports:
       # Graph-webhook-endpoint. Bundet til host-IP (LAN-only), ikke 0.0.0.0 —
