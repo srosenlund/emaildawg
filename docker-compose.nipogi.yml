@@ -7,7 +7,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.sliplane
-    container_name: beeper-email
+    container_name: emaildawg
     restart: unless-stopped
     labels:
       org.opencontainers.image.source: "https://github.com/srosenlund/emaildawg"
