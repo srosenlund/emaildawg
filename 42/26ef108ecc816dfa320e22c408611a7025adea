@@ -1,0 +1,22 @@
+CLAUDE.md
+  s_499d519113ce54::t_e445fa4a1f82c5 30
+  s_499d519113ce54::t_1743683a4f8847 1-17,21,23-29,31-34
+  s_499d519113ce54::t_834e6be9cfb8a4 18-20
+  s_499d519113ce54::t_b7258191cf9f74 22
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "4226ef108ecc816dfa320e22c408611a7025adea",
+  "prompts": {},
+  "sessions": {
+    "s_499d519113ce54": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4b37c107-480d-4233-a36f-d6b36c0a44c9",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
