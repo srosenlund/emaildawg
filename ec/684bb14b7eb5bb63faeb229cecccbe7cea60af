@@ -1,0 +1,21 @@
+docs/ARCHITECTURE.html
+  s_fd44a5be6f9919::t_7be05f82ab0981 1-181
+docs/drift-report.json
+  s_fd44a5be6f9919::t_58515a485b06c9 1-18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "ec684bb14b7eb5bb63faeb229cecccbe7cea60af",
+  "prompts": {},
+  "sessions": {
+    "s_fd44a5be6f9919": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "afd3e25a-1748-4b4e-ba09-5bccbecf5d4b",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
