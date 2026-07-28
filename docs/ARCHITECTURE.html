@@ -1,0 +1,181 @@
+<title>Living Architecture</title>
+<!--
+  Generic living-architecture skeleton (Fase 1.5).
+  generate.py fills marker slots below. Panes are assembled dynamically — only
+  panes with a real source are injected. Manual prose (if added) between any
+  AUTO-MANAGED markers is preserved on regen.
+  Methodology: claude-loadout/core/living-architecture/METHODOLOGY.md
+-->
+<style>
+  :root{--ground:#F4F6F8;--surface:#FFF;--surface-2:#FBFCFD;--ink:#19212E;--muted:#5C6675;--faint:#8B94A2;--hair:#E3E7ED;--hair-strong:#D2D8E0;--accent:#0E7C86;--accent-soft:#0E7C8618;--good:#2E8B5C;--good-soft:#2E8B5C18;--warn:#B07A11;--warn-soft:#B07A1118;--drift:#6E52C4;--drift-soft:#6E52C418;--mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;--sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--sh:0 1px 2px rgba(20,30,48,.04),0 2px 8px rgba(20,30,48,.05);}
+  @media(prefers-color-scheme:dark){:root{--ground:#0E1218;--surface:#161B22;--surface-2:#1A2029;--ink:#E7EAEF;--muted:#99A3B1;--faint:#6D7887;--hair:#262D38;--hair-strong:#323A47;--accent:#2BA7B0;--accent-soft:#2BA7B01f;--good:#46B07E;--good-soft:#46B07E1f;--warn:#D3A03A;--warn-soft:#D3A03A1f;--drift:#9B84E8;--drift-soft:#9B84E81f;--sh:0 1px 2px rgba(0,0,0,.3),0 2px 10px rgba(0,0,0,.25);}}
+  :root[data-theme="light"]{--ground:#F4F6F8;--surface:#FFF;--surface-2:#FBFCFD;--ink:#19212E;--muted:#5C6675;--faint:#8B94A2;--hair:#E3E7ED;--hair-strong:#D2D8E0;--accent:#0E7C86;--accent-soft:#0E7C8618;--good:#2E8B5C;--good-soft:#2E8B5C18;--warn:#B07A11;--warn-soft:#B07A1118;--drift:#6E52C4;--drift-soft:#6E52C418;--sh:0 1px 2px rgba(20,30,48,.04),0 2px 8px rgba(20,30,48,.05);}
+  :root[data-theme="dark"]{--ground:#0E1218;--surface:#161B22;--surface-2:#1A2029;--ink:#E7EAEF;--muted:#99A3B1;--faint:#6D7887;--hair:#262D38;--hair-strong:#323A47;--accent:#2BA7B0;--accent-soft:#2BA7B01f;--good:#46B07E;--good-soft:#46B07E1f;--warn:#D3A03A;--warn-soft:#D3A03A1f;--drift:#9B84E8;--drift-soft:#9B84E81f;--sh:0 1px 2px rgba(0,0,0,.3),0 2px 10px rgba(0,0,0,.25);}
+  *{box-sizing:border-box;} html{scroll-behavior:smooth;} @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto;}}
+  body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased;}
+  .topbar{position:sticky;top:0;z-index:30;background:color-mix(in srgb,var(--ground) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--hair);}
+  .topbar-in{max-width:1180px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+  .brand{display:flex;align-items:baseline;gap:10px;margin-right:auto;} .brand .mark{font-family:var(--mono);font-weight:700;letter-spacing:-.02em;font-size:15px;} .brand .sub{font-family:var(--mono);font-size:11.5px;color:var(--faint);}
+  .meta{font-family:var(--mono);font-size:11.5px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap;} .meta b{color:var(--ink);font-weight:600;}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;white-space:nowrap;} .pill .dot{width:7px;height:7px;border-radius:50%;}
+  .pill.good{background:var(--good-soft);color:var(--good);} .pill.good .dot{background:var(--good);}
+  .pill.mut{background:var(--surface-2);color:var(--muted);border:1px solid var(--hair);} .pill.mut .dot{background:var(--faint);}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 20px 72px;}
+  h1{font-size:24px;margin:26px 0 4px;letter-spacing:-.02em;text-wrap:balance;} .lede{color:var(--muted);font-size:14px;max-width:66ch;margin:0 0 8px;}
+  .cov{font-family:var(--mono);font-size:11px;color:var(--faint);margin:2px 0 0;}
+  .eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);font-weight:600;}
+  .signal{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:12px;margin:20px 0 8px;}
+  .tile{background:var(--surface);border:1px solid var(--hair);border-radius:12px;padding:13px 14px;box-shadow:var(--sh);}
+  .tile .k{font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);}
+  .tile .v{font-size:25px;font-weight:650;letter-spacing:-.02em;margin-top:6px;font-variant-numeric:tabular-nums;} .tile .v small{font-size:13px;color:var(--muted);font-weight:500;}
+  .tile .foot{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:5px;}
+  .grid{display:grid;grid-template-columns:200px 1fr;gap:22px;margin-top:24px;align-items:start;}
+  .nav{position:sticky;top:66px;background:var(--surface);border:1px solid var(--hair);border-radius:12px;padding:8px;box-shadow:var(--sh);}
+  .nav .hd{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);padding:8px 8px 6px;}
+  .nav a{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:8px;text-decoration:none;color:var(--muted);font-size:12.5px;} .nav a:hover{background:var(--surface-2);color:var(--ink);}
+  .nav a .n{font-family:var(--mono);font-size:11px;color:var(--faint);width:18px;text-align:right;} .nav a .tag{margin-left:auto;font-family:var(--mono);font-size:9px;padding:1px 5px;border-radius:4px;}
+  .tag.auto{background:var(--accent-soft);color:var(--accent);}
+  .col{display:flex;flex-direction:column;gap:18px;min-width:0;}
+  .pane{background:var(--surface);border:1px solid var(--hair);border-radius:14px;box-shadow:var(--sh);overflow:hidden;scroll-margin-top:66px;}
+  .pane>.ph{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--hair);}
+  .pane>.ph .num{font-family:var(--mono);font-size:11px;color:var(--accent);font-weight:700;} .pane>.ph h3{font-size:15px;margin:0;letter-spacing:-.01em;} .pane>.ph .spacer{margin-left:auto;}
+  .pane .body{padding:16px;} .pane .body>p{margin:0 0 10px;font-size:13.5px;color:var(--muted);} .pane .body>p:last-child{margin-bottom:0;}
+  .srcbar{display:flex;gap:8px 14px;flex-wrap:wrap;padding:10px 16px;border-top:1px dashed var(--hair-strong);background:var(--surface-2);}
+  .chip{font-family:var(--mono);font-size:10.5px;color:var(--muted);display:inline-flex;gap:6px;align-items:center;} .chip b{color:var(--ink);font-weight:600;} .chip .lbl{color:var(--faint);}
+  ul.plain{margin:0;padding-left:18px;font-size:13px;color:var(--ink);} ul.plain li{margin:5px 0;} ul.plain li span{color:var(--muted);}
+  .mmwrap{overflow-x:auto;padding:4px;} pre.mermaid{margin:0;text-align:center;font-family:var(--mono);font-size:11px;color:var(--muted);}
+  .fleet{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+  .node{border:1px solid var(--hair);border-radius:10px;padding:11px 12px;background:var(--surface-2);}
+  .node .nm{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--accent);} .node .svc{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.45;}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;} th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--hair);vertical-align:top;}
+  th{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);font-weight:600;} td{color:var(--ink);} .tblwrap{overflow-x:auto;} td.mono,.mono-c{font-family:var(--mono);font-size:11.5px;}
+  .commits{display:flex;flex-direction:column;} .commits .c{display:flex;gap:10px;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--hair);} .commits .c:last-child{border-bottom:0;}
+  .commits .sha{font-family:var(--mono);font-size:11px;color:var(--accent);} .commits .msg{font-size:12.5px;flex:1;min-width:0;} .commits .when{font-family:var(--mono);font-size:10.5px;color:var(--faint);white-space:nowrap;}
+  .foot-note{margin-top:30px;padding-top:16px;border-top:1px solid var(--hair);font-size:12px;color:var(--faint);font-family:var(--mono);}
+  @media(max-width:900px){.signal{grid-template-columns:repeat(2,1fr);}.grid{grid-template-columns:1fr;}.nav{position:static;}.fleet{grid-template-columns:1fr;}ul.plain{columns:1 !important;}}
+</style>
+
+<div class="topbar">
+  <div class="topbar-in">
+    <div class="brand"><span class="mark">repo://<!-- AUTO-MANAGED:title -->
+emaildawg
+<!-- /AUTO-MANAGED:title --></span><span class="sub">living-architecture</span></div>
+    <div class="meta"><span>generated <b><!-- AUTO-MANAGED:genstamp -->
+2026-07-28 22:17Z
+<!-- /AUTO-MANAGED:genstamp --></b></span><span>gen <b>on-commit</b></span></div>
+    <span class="pill good"><span class="dot"></span>auto-genereret</span>
+  </div>
+</div>
+
+<div class="wrap">
+  <h1><!-- AUTO-MANAGED:title2 -->
+emaildawg
+<!-- /AUTO-MANAGED:title2 --></h1>
+  <p class="lede"><!-- AUTO-MANAGED:lede -->
+A Matrix–Email bridge built on mautrix bridgev2. Focused on reliable email consumption in Matrix rooms (not chat features).
+<!-- /AUTO-MANAGED:lede --></p>
+  <p class="cov">// <!-- AUTO-MANAGED:coverage -->
+udeladt: security (ingen kilde) · ops (ingen incident-patterns)
+<!-- /AUTO-MANAGED:coverage --></p>
+
+  <div class="eyebrow">Signal</div>
+  <div class="signal">
+<!-- AUTO-MANAGED:signal -->
+    <div class="tile"><div class="k">Stack</div><div class="v" style="font-size:17px">Docker</div><div class="foot">detekteret</div></div>
+    <div class="tile"><div class="k">Moduler</div><div class="v">3</div><div class="foot">top-niveau</div></div>
+    <div class="tile"><div class="k">Services</div><div class="v">2</div><div class="foot">compose-units</div></div>
+    <div class="tile"><div class="k">Config drift</div><div class="v" style="color:var(--drift)">1</div><div class="foot">plan-only</div></div>
+    <div class="tile"><div class="k">Commits vist</div><div class="v">8</div><div class="foot">seneste</div></div>
+    <div class="tile"><div class="k">Paneler</div><div class="v">5</div><div class="foot">2 udeladt</div></div>
+<!-- /AUTO-MANAGED:signal -->
+  </div>
+
+  <div class="grid">
+    <nav class="nav" aria-label="sektioner">
+      <div class="hd">sektioner</div>
+<!-- AUTO-MANAGED:nav -->
+      <a href="#s3"><span class="n">03</span> Context &amp; scope <span class="tag auto">auto</span></a>
+      <a href="#s5"><span class="n">05</span> Building blocks <span class="tag auto">auto</span></a>
+      <a href="#s7"><span class="n">07</span> Deployment <span class="tag auto">auto</span></a>
+      <a href="#s10"><span class="n">10</span> Quality &amp; drift <span class="tag auto">auto</span></a>
+      <a href="#hist"><span class="n">Δ</span> Change history <span class="tag auto">auto</span></a>
+<!-- /AUTO-MANAGED:nav -->
+    </nav>
+
+    <div class="col">
+<!-- AUTO-MANAGED:panes -->
+      <section class="pane" id="s3">
+        <div class="ph"><span class="num">03</span><h3>Context &amp; scope (C4)</h3><span class="spacer"></span><span class="pill mut"><span class="dot"></span>auto</span></div>
+        <div class="body">
+          <p>C4 context — systemet, dets containere og eksterne kanter.</p>
+          <div class="mmwrap"><pre class="mermaid">
+flowchart TB
+  GH[&quot;GitHub&lt;br/&gt;emaildawg&quot;] --&gt;|&quot;push · CI&quot;| SYS
+  subgraph SYS[&quot;emaildawg · Docker&quot;]
+    docker_compose_nipogi[&quot;docker-compose.nipogi&lt;br/&gt;emaildawg&quot;]
+    docker_compose[&quot;docker-compose&lt;br/&gt;emaildawg&quot;]
+  end
+  SYS --&gt;|&quot;deploy · GitOps&quot;| RT[&quot;runtime · fleet&quot;]
+</pre></div>
+          <p style="font-size:11px;color:var(--faint);margin-top:6px">Renderer i artifact-visning; lokalt vises mermaid-kilden.</p>
+        </div>
+        <div class="srcbar"><span class="chip"><span class="lbl">src</span> <b>struktur</b> → mermaid C4</span><span class="chip"><span class="lbl">trigger</span> <b>on-commit</b></span></div>
+      </section>
+
+      <section class="pane" id="s5">
+        <div class="ph"><span class="num">05</span><h3>Building blocks</h3><span class="spacer"></span><span class="pill mut"><span class="dot"></span>auto</span></div>
+        <div class="body">
+          <p>Detekteret stack. Top-niveau moduler i repoet.</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><span class="pill mut"><span class="dot"></span>Docker</span> </div>
+          <ul class="plain" style="columns:2;font-size:12px"><li>cmd</li><li>docs</li><li>pkg</li></ul>
+        </div>
+        <div class="srcbar"><span class="chip"><span class="lbl">src</span> <b>fs</b> stack-signaler + top-dirs</span><span class="chip"><span class="lbl">trigger</span> <b>on-commit</b></span></div>
+      </section>
+
+      <section class="pane" id="s7">
+        <div class="ph"><span class="num">07</span><h3>Deployment — services</h3><span class="spacer"></span><span class="pill mut"><span class="dot"></span>auto</span></div>
+        <div class="body">
+          <div class="fleet">
+            <div class="node"><div class="nm">docker-compose.nipogi</div><div class="svc">emaildawg</div></div>
+            <div class="node"><div class="nm">docker-compose</div><div class="svc">emaildawg</div></div>
+          </div>
+        </div>
+        <div class="srcbar"><span class="chip"><span class="lbl">src</span> <b>compose / nipogi-*</b></span><span class="chip"><span class="lbl">trigger</span> <b>on-commit</b></span></div>
+      </section>
+
+      <section class="pane" id="s10">
+        <div class="ph"><span class="num">10</span><h3>Quality &amp; config-drift</h3><span class="spacer"></span><span class="pill mut"><span class="dot"></span>auto</span></div>
+        <div class="body">
+          <p>Plan-only reconcile (compose-image-pins, git-dirty-config). Ingen apply — kun surfacing.</p>
+          <div style="margin-bottom:10px"><span class="pill mut" style="background:var(--drift-soft);color:var(--drift)"><span class="dot" style="background:var(--drift)"></span>1 drift</span></div>
+          <div class="tblwrap"><table>
+            <thead><tr><th>Ressource</th><th>Deklareret</th><th>Faktisk</th><th>Δ</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">emaildawg → emaildawg:local</td><td class="mono-c">tag :local</td><td class="mono-c">mutable (no digest)</td><td class="mono-c" style="color:var(--drift)">drift-risk: pin @sha256</td></tr>
+            </tbody>
+          </table></div>
+        </div>
+        <div class="srcbar"><span class="chip"><span class="lbl">src</span> <b>drift-report.json</b> ← reconcile.py</span><span class="chip"><span class="lbl">mode</span> <b>plan-only</b></span></div>
+      </section>
+
+      <section class="pane" id="hist">
+        <div class="ph"><span class="num">Δ</span><h3>Change history</h3><span class="spacer"></span><span class="pill mut"><span class="dot"></span>auto</span></div>
+        <div class="body">
+          <div class="commits">
+            <div class="c"><span class="sha">5fbc6bd</span><span class="msg">docs: CLAUDE.md metodik-arv (bølge 2) (#1)</span><span class="when">8 days ago</span></div>
+            <div class="c"><span class="sha">b7e1a4a</span><span class="msg">refactor(naming): container_name beeper-email → emaildawg</span><span class="when">11 days ago</span></div>
+            <div class="c"><span class="sha">b795dd8</span><span class="msg">feat(labels): OCI source+description paa alle stacks (naming-audit 2026-07-11)</span><span class="when">12 days ago</span></div>
+            <div class="c"><span class="sha">2b9065b</span><span class="msg">feat(naming): emaildawg -&gt; beeper-email (naming-konvention 2026-07-11)</span><span class="when">12 days ago</span></div>
+            <div class="c"><span class="sha">bcc1c5e</span><span class="msg">feat: BWS secrets-backend (homelab standard), Doppler som fallback</span><span class="when">13 days ago</span></div>
+            <div class="c"><span class="sha">244a1f7</span><span class="msg">feat(nipogi): publish Graph-webhook port 29319 til host-IP</span><span class="when">13 days ago</span></div>
+            <div class="c"><span class="sha">17f47a9</span><span class="msg">feat: NiPoGi-compose til Komodo-stack (migration fra Sliplane)</span><span class="when">2 weeks ago</span></div>
+            <div class="c"><span class="sha">c6b43e2</span><span class="msg">fix(readermode): bulk-pruner tømte Outlook-nyhedsbreve til ren subject-linje</span><span class="when">3 weeks ago</span></div>
+          </div>
+        </div>
+        <div class="srcbar"><span class="chip"><span class="lbl">src</span> <b>git log</b></span><span class="chip"><span class="lbl">trigger</span> <b>on-commit</b></span></div>
+      </section>
+<!-- /AUTO-MANAGED:panes -->
+      <p class="foot-note">// auto-genereret fra repoets kilder · paneler uden kilde udelades · Fase 1.5</p>
+    </div>
+  </div>
+</div>

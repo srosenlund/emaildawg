@@ -1,0 +1,18 @@
+{
+  "generated": "2026-07-28 22:17Z",
+  "mode": "plan-only",
+  "sources": [
+    "compose-image-pins",
+    "git-dirty-config"
+  ],
+  "count": 1,
+  "items": [
+    {
+      "resource": "emaildawg → emaildawg:local",
+      "declared": "tag :local",
+      "actual": "mutable (no digest)",
+      "delta": "drift-risk: pin @sha256",
+      "seen": "now"
+    }
+  ]
+}
