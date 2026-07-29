@@ -1,0 +1,23 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Fleet-politik (Stefan 2026-07-29, styret fra private-agents' renovate-workflow): images/Dockerfile-bases auto-opdateres. minor/patch/digest automerge; majors aabner PR og venter. NB: dette repo har ingen CI-gate — automerge sker uden checks.",
+  "enabledManagers": ["docker-compose", "dockerfile"],
+  "packageRules": [
+    {
+      "matchUpdateTypes": ["minor", "patch", "digest", "pin"],
+      "automerge": true,
+      "automergeType": "pr",
+      "platformAutomerge": true,
+      "labels": ["renovate"]
+    },
+    {
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "labels": ["renovate", "major-bump"]
+    }
+  ],
+  "prConcurrentLimit": 3,
+  "branchPrefix": "renovate/",
+  "commitMessagePrefix": "chore(deps):",
+  "dependencyDashboard": false
+}
