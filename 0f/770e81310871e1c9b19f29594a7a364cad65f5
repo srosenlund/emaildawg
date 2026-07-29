@@ -1,0 +1,19 @@
+renovate.json
+  s_fd44a5be6f9919::t_72dca516db7f7c 1-23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "0f770e81310871e1c9b19f29594a7a364cad65f5",
+  "prompts": {},
+  "sessions": {
+    "s_fd44a5be6f9919": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "afd3e25a-1748-4b4e-ba09-5bccbecf5d4b",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Stefan Rosenlund <mail@stefanrosenlund.dk>"
+    }
+  }
+}
